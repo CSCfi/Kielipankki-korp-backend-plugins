@@ -779,9 +779,15 @@ def query(args):
                 yield {"progress_corpora": list(corpora_hits.keys())}
 
             with ThreadPoolExecutor(max_workers=config.PARALLEL_THREADS) as executor:
+                # The query worker is outside the request context, so we pass
+                # the current request object to it, so that the plugin hook
+                # points in run_cqp can use it, without raising a "Working
+                # outside of request context" exception.
                 future_query = dict(
                     (executor.submit(query_and_parse, corpus, within=within[corpus], context=context[corpus],
-                                     start=corpora_hits[corpus][0], end=corpora_hits[corpus][1], **queryparams),
+                                     start=corpora_hits[corpus][0], end=corpora_hits[corpus][1],
+                                     request=request._get_current_object(),
+                                     **queryparams),
                      corpus)
                     for corpus in corpora_hits)
 
@@ -853,9 +859,22 @@ def query(args):
                         ns.total_hits += saved_statistics[corpus]
 
             with ThreadPoolExecutor(max_workers=config.PARALLEL_THREADS) as executor:
+                # The query worker is outside the request context, so we pass
+                # the current request object to it, so that the plugin hook
+                # points in run_cqp can use it, without raising a "Working
+                # outside of request context" exception.
+                #
+                # In this particular case, an approach defining an inner
+                # function calling query_corpus and decorated with
+                # @copy_current_request_context would also seem to work, but in
+                # other similar places, it would raise a "popped wrong context"
+                # exception, even when setting
+                # app.config["PRESERVE_CONTEXT_ON_EXCEPTION"] = False. Why?
                 future_query = dict(
                     (executor.submit(query_corpus, corpus, within=within[corpus],
-                                     context=context[corpus], start=0, end=0, no_results=True, **queryparams),
+                                     context=context[corpus], start=0, end=0, no_results=True,
+                                     request=request._get_current_object(),
+                                     **queryparams),
                      corpus)
                     for corpus in ns.rest_corpora if corpus not in saved_statistics)
 
@@ -1002,7 +1021,9 @@ def query_optimize(cqp, cqpparams, find_match=True, expand=True, free_search=Fal
 
 def query_corpus(corpus, cqp, within=None, cut=None, context=None, show=None, show_structs=None, start=0, end=10,
                  sort=None, random_seed=None,
-                 no_results=False, expand_prequeries=True, free_search=False, use_cache=False):
+                 no_results=False, expand_prequeries=True, free_search=False, use_cache=False,
+                 request=request):
+    # request is used only for passing to run_cqp
     if use_cache:
         # Calculate checksum
         # Needs to contain all arguments that may influence the results
@@ -1159,7 +1180,7 @@ def query_corpus(corpus, cqp, within=None, cut=None, context=None, show=None, sh
     ######################################################################
     # Then we call the CQP binary, and read the results
 
-    lines = run_cqp(cmd, attr_ignore=True)
+    lines = run_cqp(cmd, attr_ignore=True, request=request)
 
     # Skip the CQP version
     next(lines)
@@ -1352,9 +1373,11 @@ def query_parse_lines(corpus, lines, attrs, show, show_structs, free_matches=Fal
 
 def query_and_parse(corpus, cqp, within=None, cut=None, context=None, show=None, show_structs=None, start=0, end=10,
                     sort=None, random_seed=None, no_results=False, expand_prequeries=True, free_search=False,
-                    use_cache=False):
+                    use_cache=False, request=request):
+    # request is used only for passing to run_cqp via query_corpus
     lines, nr_hits, attrs = query_corpus(corpus, cqp, within, cut, context, show, show_structs, start, end, sort,
-                                         random_seed, no_results, expand_prequeries, free_search, use_cache)
+                                         random_seed, no_results, expand_prequeries, free_search, use_cache,
+                                         request)
     kwic = query_parse_lines(corpus, lines, attrs, show, show_structs, free_matches=free_search)
     return kwic, nr_hits
 
