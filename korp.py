@@ -302,11 +302,7 @@ def info(args):
 
     corpora = run_cqp("show corpora;")
     version = next(corpora)
-    protected = []
-
-    if config.PROTECTED_FILE:
-        with open(config.PROTECTED_FILE) as infile:
-            protected = [x.strip() for x in infile.readlines()]
+    protected = get_protected_corpora()
 
     result = {"version": KORP_VERSION, "cqp_version": version, "corpora": list(corpora), "protected_corpora": protected}
 
@@ -3326,11 +3322,10 @@ def check_authentication(corpora):
     """Take a list of corpora, and if any of them are protected, run authentication.
     Raises an error if authentication fails."""
 
-    if config.PROTECTED_FILE:
+    protected = get_protected_corpora()
+    if protected:
         # Split parallel corpora
         corpora = [cc for c in corpora for cc in c.split("|")]
-        with open(config.PROTECTED_FILE) as infile:
-            protected = [x.strip() for x in infile.readlines()]
         c = [c for c in corpora if c.upper() in protected]
         if c:
             auth = generator_to_dict(authenticate({}))
@@ -3338,6 +3333,15 @@ def check_authentication(corpora):
             if not auth or unauthorized:
                 raise KorpAuthenticationError("You do not have access to the following corpora: %s" %
                                               ", ".join(unauthorized))
+
+
+def get_protected_corpora():
+    """Return a list of protected corpora."""
+    protected = []
+    if config.PROTECTED_FILE:
+        with open(config.PROTECTED_FILE) as infile:
+            protected = [x.strip() for x in infile.readlines()]
+    return protected
 
 
 def generator_to_dict(generator):
