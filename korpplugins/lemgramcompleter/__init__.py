@@ -119,8 +119,8 @@ def _query_lemgrams(cursor, wf, param_corpora, limit):
         for suffpatt, is_any_prefix in [("..%", False), ("%", True)]:
             sql = _make_lemgram_query_part(wf + suffpatt, corpora, limit)
             # print(sql)
-            sql = korppluginlib.KorpCallbackPluginCaller.call_chain_for_request(
-                "filter_sql", sql)
+            sql = (korppluginlib.KorpCallbackPluginCaller
+                   .filter_value_for_request("filter_sql", sql))
             cursor.execute(sql)
             _retrieve_lemgrams(cursor, wf, modcase, is_any_prefix, result,
                                result_set)
