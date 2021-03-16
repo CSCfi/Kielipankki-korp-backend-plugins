@@ -136,7 +136,7 @@ def main_handler(generator):
                                    }}
                 if "debug" in args:
                     error["ERROR"]["traceback"] = "".join(traceback.format_exception(*exc)).splitlines()
-                plugin_caller.call("error", error, exc)
+                plugin_caller.raise_event("error", error, exc)
                 return error
 
             def incremental_json(ff):
@@ -151,7 +151,7 @@ def main_handler(generator):
                             # Yield whitespace to prevent timeout
                             yield " \n"
                         else:
-                            response = plugin_caller.call_chain(
+                            response = plugin_caller.filter_value(
                                 "filter_result", response)
                             yield json.dumps(response)[1:-1] + ",\n"
                 except GeneratorExit:
@@ -162,7 +162,7 @@ def main_handler(generator):
 
                 endtime = time.time()
                 elapsed_time = endtime - starttime
-                plugin_caller.call("exit_handler", endtime, elapsed_time)
+                plugin_caller.raise_event("exit_handler", endtime, elapsed_time)
                 yield json.dumps({"time": elapsed_time})[1:] + "\n"
                 if callback:
                     yield ")"
@@ -188,13 +188,13 @@ def main_handler(generator):
                 elapsed_time = endtime - starttime
                 result["time"] = elapsed_time
 
-                result = plugin_caller.call_chain("filter_result", result)
+                result = plugin_caller.filter_value("filter_result", result)
 
                 if callback:
                     result = callback + "(" + json.dumps(result, indent=indent) + ")"
                 else:
                     result = json.dumps(result, indent=indent)
-                plugin_caller.call("exit_handler", endtime, elapsed_time)
+                plugin_caller.raise_event("exit_handler", endtime, elapsed_time)
                 yield result
                 plugin_caller.cleanup()
 
@@ -225,12 +225,12 @@ def main_handler(generator):
 
                 # Filter only the content. Should we also allow filtering the
                 # headers and/or mimetype, using separate hook points?
-                result["content"] = plugin_caller.call_chain(
+                result["content"] = plugin_caller.filter_value(
                     "filter_result", result["content"])
 
                 endtime = time.time()
                 elapsed_time = endtime - starttime
-                plugin_caller.call("exit_handler", endtime, elapsed_time)
+                plugin_caller.raise_event("exit_handler", endtime, elapsed_time)
                 plugin_caller.cleanup()
 
                 return Response(result.get("content"),
@@ -238,8 +238,8 @@ def main_handler(generator):
                                 mimetype=result.get("mimetype"))
 
             starttime = time.time()
-            plugin_caller.call("enter_handler", args, starttime)
-            args = plugin_caller.call_chain("filter_args", args)
+            plugin_caller.raise_event("enter_handler", args, starttime)
+            args = plugin_caller.filter_value("filter_args", args)
             incremental = parse_bool(args, "incremental", False)
             callback = args.get("callback")
             indent = int(args.get("indent", 0))
@@ -374,11 +374,7 @@ def info(args):
 
     corpora = run_cqp("show corpora;")
     version = next(corpora)
-    protected = []
-
-    if config.PROTECTED_FILE:
-        with open(config.PROTECTED_FILE) as infile:
-            protected = [x.strip() for x in infile.readlines()]
+    protected = get_protected_corpora()
 
     result = {"version": KORP_VERSION, "cqp_version": version, "corpora": list(corpora), "protected_corpora": protected}
 
@@ -2456,7 +2452,7 @@ def sql_escape(s):
 
 
 def sql_execute(cursor, sql):
-    sql = korppluginlib.KorpCallbackPluginCaller.call_chain_for_request(
+    sql = korppluginlib.KorpCallbackPluginCaller.filter_value_for_request(
         "filter_sql", sql)
     cursor.execute(sql)
 
@@ -3317,13 +3313,13 @@ def run_cqp(command, encoding=None, executable=config.CQP_EXECUTABLE,
         command = "\n".join(command)
     command = "set PrettyPrint off;\n" + command
     command = command.encode(encoding)
-    command = plugin_caller.call_chain("filter_cqp_input", command)
+    command = plugin_caller.filter_value("filter_cqp_input", command)
     process = subprocess.Popen([executable, "-c", "-r", registry],
                                stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE, env=env)
     reply, error = process.communicate(command)
-    reply, error = plugin_caller.call_chain(
+    reply, error = plugin_caller.filter_value(
         "filter_cqp_output", (reply, error))
     if error:
         error = error.decode(encoding)
@@ -3452,11 +3448,10 @@ def check_authentication(corpora):
     """Take a list of corpora, and if any of them are protected, run authentication.
     Raises an error if authentication fails."""
 
-    if config.PROTECTED_FILE:
+    protected = get_protected_corpora()
+    if protected:
         # Split parallel corpora
         corpora = [cc for c in corpora for cc in c.split("|")]
-        with open(config.PROTECTED_FILE) as infile:
-            protected = [x.strip() for x in infile.readlines()]
         c = [c for c in corpora if c.upper() in protected]
         if c:
             auth = generator_to_dict(authenticate({}))
@@ -3464,6 +3459,15 @@ def check_authentication(corpora):
             if not auth or unauthorized:
                 raise KorpAuthenticationError("You do not have access to the following corpora: %s" %
                                               ", ".join(unauthorized))
+
+
+def get_protected_corpora():
+    """Return a list of protected corpora."""
+    protected = []
+    if config.PROTECTED_FILE:
+        with open(config.PROTECTED_FILE) as infile:
+            protected = [x.strip() for x in infile.readlines()]
+    return protected
 
 
 def generator_to_dict(generator):
