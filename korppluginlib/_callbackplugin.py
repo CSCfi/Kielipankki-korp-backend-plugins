@@ -139,21 +139,21 @@ class KorpCallbackPluginCaller:
         # Remove self from _instances
         del self._instances[id(self._request)]
 
-    def call(self, hook_point, *args, **kwargs):
-        """Call the callbacks for hook_point, discarding return values.
+    def raise_event(self, hook_point, *args, **kwargs):
+        """Raise the event hook_point, discarding callback return values.
 
-        Call the callback methods registered for hook_point with args
-        and kwargs in sequence, discarding return values. Callback
-        methods in plugin classes whose applies_to method returns
-        false for the current request are skipped.
+        Call the callback methods registered for the event hook point
+        hook_point with args and kwargs in sequence, discarding return
+        values. Callback methods in plugin classes whose applies_to
+        method returns false for the current request are skipped.
         """
         for callback, applies_to in (KorpCallbackPlugin
                                     ._callbacks.get(hook_point, [])):
             if applies_to(self._request):
                 callback(*args, self._request, **kwargs)
 
-    def call_collect(self, hook_point, *args, **kwargs):
-        """Call the callbacks for hook_point; collect return values to a list.
+    def get_values(self, hook_point, *args, **kwargs):
+        """Get the values returned by the callbacks for hook_point as a list.
 
         Call the callback methods registered for hook_point with args
         and kwargs in sequence, collect their return values to a list
@@ -170,16 +170,17 @@ class KorpCallbackPluginCaller:
                     result.append(retval)
         return result
 
-    def call_chain(self, hook_point, arg1, *args, **kwargs):
-        """Call the callbacks for hook_point, passing return value to the next.
+    def filter_value(self, hook_point, arg1, *args, **kwargs):
+        """Filter arg1 through the callbacks for hook_point.
 
-        Return the value of arg1 as passed through the callback
-        methods registered for hook_point, with the return value of
-        the preceding callback as the arg1 value of the following one,
-        unless it is None, in which case arg1 is kept as is. *args and
-        **kwargs are passed to each callback method as they are.
-        Callback methods in plugin classes whose applies_to method
-        returns false for the current request are skipped.
+        Return the value of arg1 as passed through the filtering
+        callback methods registered for the filter hook point
+        hook_point, with the return value of the preceding callback as
+        the arg1 value of the following one, unless it is None, in
+        which case arg1 is kept as is. *args and **kwargs are passed
+        to each callback method as they are. Callback methods in
+        plugin classes whose applies_to method returns false for the
+        current request are skipped.
 
         This can be thought of as applying successive filters,
         function composition for the callbacks, or a reduce operation
@@ -194,29 +195,29 @@ class KorpCallbackPluginCaller:
         return arg1
 
     @classmethod
-    def call_for_request(cls, hook_point, *args, request=None, **kwargs):
+    def raise_event_for_request(cls, hook_point, *args, request=None, **kwargs):
         """Call the callbacks for hook_point for request.
 
         If request is None, use the global request proxy.
         """
-        cls.get_instance(request).call(hook_point, *args, **kwargs)
+        cls.get_instance(request).raise_event(hook_point, *args, **kwargs)
 
     @classmethod
-    def call_collect_for_request(cls, hook_point, *args, request=None,
-                                 **kwargs):
+    def get_values_for_request(cls, hook_point, *args, request=None,
+                               **kwargs):
         """Call the callbacks for hook_point for request, collecting to a list.
 
         If request is None, use the global request proxy.
         """
-        return cls.get_instance(request).call_collect(
+        return cls.get_instance(request).get_values(
             hook_point, *args, **kwargs)
 
     @classmethod
-    def call_chain_for_request(cls, hook_point, arg1, *args, request=None,
-                               **kwargs):
+    def filter_value_for_request(cls, hook_point, arg1, *args, request=None,
+                                **kwargs):
         """Call the callbacks for hook_point for request, passing return value.
 
         If request is None, use the global request proxy.
         """
-        return cls.get_instance(request).call_chain(
+        return cls.get_instance(request).filter_value(
             hook_point, arg1, *args, **kwargs)
