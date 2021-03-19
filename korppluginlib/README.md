@@ -401,6 +401,20 @@ the following:
   `sql` to be passed to the MySQL/MariaDB database server and returns
   the modified value.
 
+- `filter_protected_corpora(self, protected_corpora, request)`:
+  Modifies (or replaces) the list `protected_corpora` of ids of
+  protected corpora, the use of which requires authentication and
+  authorization.
+
+- `filter_auth_postdata(self, postdata, request)`: Modifies (or
+  replaces) the POST request parameters in `postdata`, to be passed to
+  the authorization server (`config.AUTH_SERVER`) in the endpoint
+  `/authenticate`.
+
+- `filter_auth_response(self, auth_response, request)`: Modifies the
+  response `auth_response` returned by the authorization server in the
+  endpoint `/authenticate`.
+
 
 ### Event hook points
 
@@ -504,9 +518,9 @@ methods is the actual Flask request object, not the global proxy.
 
 In addition to the hook points in `korp.py` listed above, you can
 define hook points in plugins by invoking callbacks with the name of
-the hook point by using special call methods. For example, a logging
-plugin could implement a callback method `log` that could be called
-from other plugins, both callback and endpoint plugins.
+the hook point by using the appropriate methods. For example, a
+logging plugin could implement a callback method `log` that could be
+called from other plugins, both callback and endpoint plugins.
 
 Given the Flask request object (or the global request proxy)
 `request`, callbacks for the (event) hook point `hook_point` can be
@@ -514,7 +528,7 @@ called as follows, with `*args` and `**kwargs` as the positional and
 keyword arguments and discarding the return value:
 
 ```python
-korppluginlib.KorpCallbackPluginCaller.call_for_request(
+korppluginlib.KorpCallbackPluginCaller.raise_event_for_request(
     "hook_point", *args, request, **kwargs)
 ```
 
@@ -524,7 +538,7 @@ contains several hook points):
 
 ```python
 plugin_caller = korppluginlib.KorpCallbackPluginCaller.get_instance(request)
-plugin_caller.call("hook_point", *args, **kwargs)
+plugin_caller.raise_event("hook_point", *args, **kwargs)
 ```
 
 If `request` is omitted or `None`, the request object referred to by
@@ -544,16 +558,16 @@ argument.
 
 Three types of call methods are available in KorpCallbackPluginCaller:
 
-- `call_for_request` (and instance method `call`): Call the callback
-  methods and discard their possible return values (for event hook
-  points).
+- `raise_event_for_request` (and instance method `raise_event`): Call
+  the callback methods and discard their possible return values (for
+  event hook points).
 
-- `call_chain_for_request` (and `call_chain`): Call the callback
+- `filter_value_for_request` (and `filter_value`): Call the callback
   methods and pass the return value as the first argument of the next
   callback method, and return the value returned by the last callback
   emthod (for filter hook points).
 
-- `call_collect_for_request` (and `call_collect`): Call the callback
+- `get_values_for_request` (and `get_values`): Call the callback
   methods, collect their return values to a list and finally return
   the list.
 
