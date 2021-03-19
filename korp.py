@@ -3410,7 +3410,9 @@ def assert_key(key, attrs, regexp, required=False):
 def authenticate(_=None):
     """Authenticate a user against an authentication server."""
 
+    plugin_caller = korppluginlib.KorpCallbackPluginCaller.get_instance()
     auth_data = request.authorization
+    postdata = None
 
     if auth_data:
         postdata = {
@@ -3420,6 +3422,9 @@ def authenticate(_=None):
                                           config.AUTH_SECRET, "utf-8")).hexdigest()
         }
 
+    postdata = plugin_caller.filter_value("filter_auth_postdata", postdata)
+
+    if postdata:
         try:
             contents = urllib.request.urlopen(config.AUTH_SERVER,
                                               urllib.parse.urlencode(postdata).encode("utf-8")).read().decode("utf-8")
@@ -3430,6 +3435,9 @@ def authenticate(_=None):
             raise KorpAuthenticationError("Invalid response from authentication server.")
         except:
             raise KorpAuthenticationError("Unexpected error during authentication.")
+
+        auth_response = plugin_caller.filter_value(
+            "filter_auth_response", auth_response)
 
         if auth_response["authenticated"]:
             permitted_resources = auth_response["permitted_resources"]

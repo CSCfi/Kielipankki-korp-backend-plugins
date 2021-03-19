@@ -406,6 +406,15 @@ the following:
   protected corpora, the use of which requires authentication and
   authorization.
 
+- `filter_auth_postdata(self, postdata, request)`: Modifies (or
+  replaces) the POST request parameters in `postdata`, to be passed to
+  the authorization server (`config.AUTH_SERVER`) in the endpoint
+  `/authenticate`.
+
+- `filter_auth_response(self, auth_response, request)`: Modifies the
+  response `auth_response` returned by the authorization server in the
+  endpoint `/authenticate`.
+
 
 ### Event hook points
 
