@@ -401,6 +401,10 @@ the following:
   `sql` to be passed to the MySQL/MariaDB database server and returns
   the modified value.
 
+- `filter_protected_corpora(self, protected_corpora, request)`:
+  Modifies the list `protected_corpora` of ids of protected corpora,
+  the use of which requires authentication and authorization.
+
 
 ### Event hook points
 
