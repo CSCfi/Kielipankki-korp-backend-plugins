@@ -3467,6 +3467,11 @@ def get_protected_corpora():
     if config.PROTECTED_FILE:
         with open(config.PROTECTED_FILE) as infile:
             protected = [x.strip() for x in infile.readlines()]
+    # Even though the hook point is named "filter_protected_corpora", its
+    # callbacks typically add protected corpora to an initially empty list
+    protected = (korppluginlib.KorpCallbackPluginCaller
+                 .filter_value_for_request("filter_protected_corpora",
+                                           protected))
     return protected
 
 
