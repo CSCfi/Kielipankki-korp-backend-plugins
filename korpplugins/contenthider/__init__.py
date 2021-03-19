@@ -54,7 +54,7 @@ class QueryContentHider(korppluginlib.KorpCallbackPlugin):
     def filter_result(self, result, request):
         """Hide (mask) attributes of structures marked as hidden."""
         for row_num, kwic_row in enumerate(result.get("kwic", [])):
-            linestructs = kwic_row["structs"]
+            linestructs = kwic_row.get("structs", {})
             # Hide (mask) results that are within structures listed in
             # pluginconf.HIDDEN_STRUCT_NAMES by replacing actual attribute values
             # with fixed values. Note that the structure name exists in
@@ -70,7 +70,7 @@ class QueryContentHider(korppluginlib.KorpCallbackPlugin):
                         dict((key, (pluginconf.HIDDEN_VALUE_POS_ATTR
                                     if key != "structs" else val))
                              for key, val in token.items())
-                        for token in kwic_row["tokens"]]
+                        for token in kwic_row.get("tokens", [])]
                 # Replace structural attribute annotation values with
                 # pluginconf.HIDDEN_VALUE_STRUCT_ATTR
                 if pluginconf.HIDDEN_VALUE_STRUCT_ATTR is not None:
@@ -83,7 +83,7 @@ class QueryContentHider(korppluginlib.KorpCallbackPlugin):
                 # Adjust match position to the start of the sentence if
                 # pluginconf.HIDE_MATCH_POS
                 if pluginconf.HIDE_MATCH_POS:
-                    match = kwic_row["match"]
+                    match = kwic_row.get("match", {"position": 0, "start": 0})
                     pos = match["position"] - match["start"]
                     kwic_row["match"] = {
                         "position": pos,
