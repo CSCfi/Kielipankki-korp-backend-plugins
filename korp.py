@@ -136,7 +136,7 @@ def main_handler(generator):
                                    }}
                 if "debug" in args:
                     error["ERROR"]["traceback"] = "".join(traceback.format_exception(*exc)).splitlines()
-                plugin_caller.call("error", error, exc)
+                plugin_caller.raise_event("error", error, exc)
                 return error
 
             def incremental_json(ff):
@@ -151,7 +151,7 @@ def main_handler(generator):
                             # Yield whitespace to prevent timeout
                             yield " \n"
                         else:
-                            response = plugin_caller.call_chain(
+                            response = plugin_caller.filter_value(
                                 "filter_result", response)
                             yield json.dumps(response)[1:-1] + ",\n"
                 except GeneratorExit:
@@ -162,7 +162,7 @@ def main_handler(generator):
 
                 endtime = time.time()
                 elapsed_time = endtime - starttime
-                plugin_caller.call("exit_handler", endtime, elapsed_time)
+                plugin_caller.raise_event("exit_handler", endtime, elapsed_time)
                 yield json.dumps({"time": elapsed_time})[1:] + "\n"
                 if callback:
                     yield ")"
@@ -188,13 +188,13 @@ def main_handler(generator):
                 elapsed_time = endtime - starttime
                 result["time"] = elapsed_time
 
-                result = plugin_caller.call_chain("filter_result", result)
+                result = plugin_caller.filter_value("filter_result", result)
 
                 if callback:
                     result = callback + "(" + json.dumps(result, indent=indent) + ")"
                 else:
                     result = json.dumps(result, indent=indent)
-                plugin_caller.call("exit_handler", endtime, elapsed_time)
+                plugin_caller.raise_event("exit_handler", endtime, elapsed_time)
                 yield result
                 plugin_caller.cleanup()
 
@@ -225,12 +225,12 @@ def main_handler(generator):
 
                 # Filter only the content. Should we also allow filtering the
                 # headers and/or mimetype, using separate hook points?
-                result["content"] = plugin_caller.call_chain(
+                result["content"] = plugin_caller.filter_value(
                     "filter_result", result["content"])
 
                 endtime = time.time()
                 elapsed_time = endtime - starttime
-                plugin_caller.call("exit_handler", endtime, elapsed_time)
+                plugin_caller.raise_event("exit_handler", endtime, elapsed_time)
                 plugin_caller.cleanup()
 
                 return Response(result.get("content"),
@@ -238,8 +238,8 @@ def main_handler(generator):
                                 mimetype=result.get("mimetype"))
 
             starttime = time.time()
-            plugin_caller.call("enter_handler", args, starttime)
-            args = plugin_caller.call_chain("filter_args", args)
+            plugin_caller.raise_event("enter_handler", args, starttime)
+            args = plugin_caller.filter_value("filter_args", args)
             incremental = parse_bool(args, "incremental", False)
             callback = args.get("callback")
             indent = int(args.get("indent", 0))
@@ -2452,7 +2452,7 @@ def sql_escape(s):
 
 
 def sql_execute(cursor, sql):
-    sql = korppluginlib.KorpCallbackPluginCaller.call_chain_for_request(
+    sql = korppluginlib.KorpCallbackPluginCaller.filter_value_for_request(
         "filter_sql", sql)
     cursor.execute(sql)
 
@@ -3313,13 +3313,13 @@ def run_cqp(command, encoding=None, executable=config.CQP_EXECUTABLE,
         command = "\n".join(command)
     command = "set PrettyPrint off;\n" + command
     command = command.encode(encoding)
-    command = plugin_caller.call_chain("filter_cqp_input", command)
+    command = plugin_caller.filter_value("filter_cqp_input", command)
     process = subprocess.Popen([executable, "-c", "-r", registry],
                                stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE, env=env)
     reply, error = process.communicate(command)
-    reply, error = plugin_caller.call_chain(
+    reply, error = plugin_caller.filter_value(
         "filter_cqp_output", (reply, error))
     if error:
         error = error.decode(encoding)
@@ -3410,7 +3410,9 @@ def assert_key(key, attrs, regexp, required=False):
 def authenticate(_=None):
     """Authenticate a user against an authentication server."""
 
+    plugin_caller = korppluginlib.KorpCallbackPluginCaller.get_instance()
     auth_data = request.authorization
+    postdata = None
 
     if auth_data:
         postdata = {
@@ -3420,6 +3422,9 @@ def authenticate(_=None):
                                           config.AUTH_SECRET, "utf-8")).hexdigest()
         }
 
+    postdata = plugin_caller.filter_value("filter_auth_postdata", postdata)
+
+    if postdata:
         try:
             contents = urllib.request.urlopen(config.AUTH_SERVER,
                                               urllib.parse.urlencode(postdata).encode("utf-8")).read().decode("utf-8")
@@ -3430,6 +3435,9 @@ def authenticate(_=None):
             raise KorpAuthenticationError("Invalid response from authentication server.")
         except:
             raise KorpAuthenticationError("Unexpected error during authentication.")
+
+        auth_response = plugin_caller.filter_value(
+            "filter_auth_response", auth_response)
 
         if auth_response["authenticated"]:
             permitted_resources = auth_response["permitted_resources"]
@@ -3467,6 +3475,11 @@ def get_protected_corpora():
     if config.PROTECTED_FILE:
         with open(config.PROTECTED_FILE) as infile:
             protected = [x.strip() for x in infile.readlines()]
+    # Even though the hook point is named "filter_protected_corpora", its
+    # callbacks typically add protected corpora to an initially empty list
+    protected = (korppluginlib.KorpCallbackPluginCaller
+                 .filter_value_for_request("filter_protected_corpora",
+                                           protected))
     return protected
 
 
