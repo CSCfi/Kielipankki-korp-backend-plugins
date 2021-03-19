@@ -136,7 +136,7 @@ def main_handler(generator):
                                    }}
                 if "debug" in args:
                     error["ERROR"]["traceback"] = "".join(traceback.format_exception(*exc)).splitlines()
-                plugin_caller.call("error", error, exc)
+                plugin_caller.raise_event("error", error, exc)
                 return error
 
             def incremental_json(ff):
@@ -151,7 +151,7 @@ def main_handler(generator):
                             # Yield whitespace to prevent timeout
                             yield " \n"
                         else:
-                            response = plugin_caller.call_chain(
+                            response = plugin_caller.filter_value(
                                 "filter_result", response)
                             yield json.dumps(response)[1:-1] + ",\n"
                 except GeneratorExit:
@@ -162,7 +162,7 @@ def main_handler(generator):
 
                 endtime = time.time()
                 elapsed_time = endtime - starttime
-                plugin_caller.call("exit_handler", endtime, elapsed_time)
+                plugin_caller.raise_event("exit_handler", endtime, elapsed_time)
                 yield json.dumps({"time": elapsed_time})[1:] + "\n"
                 if callback:
                     yield ")"
@@ -188,13 +188,13 @@ def main_handler(generator):
                 elapsed_time = endtime - starttime
                 result["time"] = elapsed_time
 
-                result = plugin_caller.call_chain("filter_result", result)
+                result = plugin_caller.filter_value("filter_result", result)
 
                 if callback:
                     result = callback + "(" + json.dumps(result, indent=indent) + ")"
                 else:
                     result = json.dumps(result, indent=indent)
-                plugin_caller.call("exit_handler", endtime, elapsed_time)
+                plugin_caller.raise_event("exit_handler", endtime, elapsed_time)
                 yield result
                 plugin_caller.cleanup()
 
@@ -225,12 +225,12 @@ def main_handler(generator):
 
                 # Filter only the content. Should we also allow filtering the
                 # headers and/or mimetype, using separate hook points?
-                result["content"] = plugin_caller.call_chain(
+                result["content"] = plugin_caller.filter_value(
                     "filter_result", result["content"])
 
                 endtime = time.time()
                 elapsed_time = endtime - starttime
-                plugin_caller.call("exit_handler", endtime, elapsed_time)
+                plugin_caller.raise_event("exit_handler", endtime, elapsed_time)
                 plugin_caller.cleanup()
 
                 return Response(result.get("content"),
@@ -238,8 +238,8 @@ def main_handler(generator):
                                 mimetype=result.get("mimetype"))
 
             starttime = time.time()
-            plugin_caller.call("enter_handler", args, starttime)
-            args = plugin_caller.call_chain("filter_args", args)
+            plugin_caller.raise_event("enter_handler", args, starttime)
+            args = plugin_caller.filter_value("filter_args", args)
             incremental = parse_bool(args, "incremental", False)
             callback = args.get("callback")
             indent = int(args.get("indent", 0))
@@ -374,11 +374,7 @@ def info(args):
 
     corpora = run_cqp("show corpora;")
     version = next(corpora)
-    protected = []
-
-    if config.PROTECTED_FILE:
-        with open(config.PROTECTED_FILE) as infile:
-            protected = [x.strip() for x in infile.readlines()]
+    protected = get_protected_corpora()
 
     result = {"version": KORP_VERSION, "cqp_version": version, "corpora": list(corpora), "protected_corpora": protected}
 
@@ -696,9 +692,15 @@ def query(args):
                 yield {"progress_corpora": list(corpora_hits.keys())}
 
             with ThreadPoolExecutor(max_workers=config.PARALLEL_THREADS) as executor:
+                # The query worker is outside the request context, so we pass
+                # the current request object to it, so that the plugin hook
+                # points in run_cqp can use it, without raising a "Working
+                # outside of request context" exception.
                 future_query = dict(
                     (executor.submit(query_and_parse, corpus, within=within[corpus], context=context[corpus],
-                                     start=corpora_hits[corpus][0], end=corpora_hits[corpus][1], **queryparams),
+                                     start=corpora_hits[corpus][0], end=corpora_hits[corpus][1],
+                                     request=request._get_current_object(),
+                                     **queryparams),
                      corpus)
                     for corpus in corpora_hits)
 
@@ -770,9 +772,22 @@ def query(args):
                         ns.total_hits += saved_statistics[corpus]
 
             with ThreadPoolExecutor(max_workers=config.PARALLEL_THREADS) as executor:
+                # The query worker is outside the request context, so we pass
+                # the current request object to it, so that the plugin hook
+                # points in run_cqp can use it, without raising a "Working
+                # outside of request context" exception.
+                #
+                # In this particular case, an approach defining an inner
+                # function calling query_corpus and decorated with
+                # @copy_current_request_context would also seem to work, but in
+                # other similar places, it would raise a "popped wrong context"
+                # exception, even when setting
+                # app.config["PRESERVE_CONTEXT_ON_EXCEPTION"] = False. Why?
                 future_query = dict(
                     (executor.submit(query_corpus, corpus, within=within[corpus],
-                                     context=context[corpus], start=0, end=0, no_results=True, **queryparams),
+                                     context=context[corpus], start=0, end=0, no_results=True,
+                                     request=request._get_current_object(),
+                                     **queryparams),
                      corpus)
                     for corpus in ns.rest_corpora if corpus not in saved_statistics)
 
@@ -919,7 +934,9 @@ def query_optimize(cqp, cqpparams, find_match=True, expand=True, free_search=Fal
 
 def query_corpus(corpus, cqp, within=None, cut=None, context=None, show=None, show_structs=None, start=0, end=10,
                  sort=None, random_seed=None,
-                 no_results=False, expand_prequeries=True, free_search=False, use_cache=False):
+                 no_results=False, expand_prequeries=True, free_search=False, use_cache=False,
+                 request=request):
+    # request is used only for passing to run_cqp
     if use_cache:
         # Calculate checksum
         # Needs to contain all arguments that may influence the results
@@ -1076,7 +1093,7 @@ def query_corpus(corpus, cqp, within=None, cut=None, context=None, show=None, sh
     ######################################################################
     # Then we call the CQP binary, and read the results
 
-    lines = run_cqp(cmd, attr_ignore=True)
+    lines = run_cqp(cmd, attr_ignore=True, request=request)
 
     # Skip the CQP version
     next(lines)
@@ -1269,9 +1286,11 @@ def query_parse_lines(corpus, lines, attrs, show, show_structs, free_matches=Fal
 
 def query_and_parse(corpus, cqp, within=None, cut=None, context=None, show=None, show_structs=None, start=0, end=10,
                     sort=None, random_seed=None, no_results=False, expand_prequeries=True, free_search=False,
-                    use_cache=False):
+                    use_cache=False, request=request):
+    # request is used only for passing to run_cqp via query_corpus
     lines, nr_hits, attrs = query_corpus(corpus, cqp, within, cut, context, show, show_structs, start, end, sort,
-                                         random_seed, no_results, expand_prequeries, free_search, use_cache)
+                                         random_seed, no_results, expand_prequeries, free_search, use_cache,
+                                         request)
     kwic = query_parse_lines(corpus, lines, attrs, show, show_structs, free_matches=free_search)
     return kwic, nr_hits
 
@@ -2433,7 +2452,7 @@ def sql_escape(s):
 
 
 def sql_execute(cursor, sql):
-    sql = korppluginlib.KorpCallbackPluginCaller.call_chain_for_request(
+    sql = korppluginlib.KorpCallbackPluginCaller.filter_value_for_request(
         "filter_sql", sql)
     cursor.execute(sql)
 
@@ -3294,13 +3313,13 @@ def run_cqp(command, encoding=None, executable=config.CQP_EXECUTABLE,
         command = "\n".join(command)
     command = "set PrettyPrint off;\n" + command
     command = command.encode(encoding)
-    command = plugin_caller.call_chain("filter_cqp_input", command)
+    command = plugin_caller.filter_value("filter_cqp_input", command)
     process = subprocess.Popen([executable, "-c", "-r", registry],
                                stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE, env=env)
     reply, error = process.communicate(command)
-    reply, error = plugin_caller.call_chain(
+    reply, error = plugin_caller.filter_value(
         "filter_cqp_output", (reply, error))
     if error:
         error = error.decode(encoding)
@@ -3391,7 +3410,9 @@ def assert_key(key, attrs, regexp, required=False):
 def authenticate(_=None):
     """Authenticate a user against an authentication server."""
 
+    plugin_caller = korppluginlib.KorpCallbackPluginCaller.get_instance()
     auth_data = request.authorization
+    postdata = None
 
     if auth_data:
         postdata = {
@@ -3401,6 +3422,9 @@ def authenticate(_=None):
                                           config.AUTH_SECRET, "utf-8")).hexdigest()
         }
 
+    postdata = plugin_caller.filter_value("filter_auth_postdata", postdata)
+
+    if postdata:
         try:
             contents = urllib.request.urlopen(config.AUTH_SERVER,
                                               urllib.parse.urlencode(postdata).encode("utf-8")).read().decode("utf-8")
@@ -3411,6 +3435,9 @@ def authenticate(_=None):
             raise KorpAuthenticationError("Invalid response from authentication server.")
         except:
             raise KorpAuthenticationError("Unexpected error during authentication.")
+
+        auth_response = plugin_caller.filter_value(
+            "filter_auth_response", auth_response)
 
         if auth_response["authenticated"]:
             permitted_resources = auth_response["permitted_resources"]
@@ -3429,11 +3456,10 @@ def check_authentication(corpora):
     """Take a list of corpora, and if any of them are protected, run authentication.
     Raises an error if authentication fails."""
 
-    if config.PROTECTED_FILE:
+    protected = get_protected_corpora()
+    if protected:
         # Split parallel corpora
         corpora = [cc for c in corpora for cc in c.split("|")]
-        with open(config.PROTECTED_FILE) as infile:
-            protected = [x.strip() for x in infile.readlines()]
         c = [c for c in corpora if c.upper() in protected]
         if c:
             auth = generator_to_dict(authenticate({}))
@@ -3441,6 +3467,20 @@ def check_authentication(corpora):
             if not auth or unauthorized:
                 raise KorpAuthenticationError("You do not have access to the following corpora: %s" %
                                               ", ".join(unauthorized))
+
+
+def get_protected_corpora():
+    """Return a list of protected corpora."""
+    protected = []
+    if config.PROTECTED_FILE:
+        with open(config.PROTECTED_FILE) as infile:
+            protected = [x.strip() for x in infile.readlines()]
+    # Even though the hook point is named "filter_protected_corpora", its
+    # callbacks typically add protected corpora to an initially empty list
+    protected = (korppluginlib.KorpCallbackPluginCaller
+                 .filter_value_for_request("filter_protected_corpora",
+                                           protected))
+    return protected
 
 
 def generator_to_dict(generator):

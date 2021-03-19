@@ -120,10 +120,12 @@ Alternatively, the configuration variables may be specified in the
 top-level module `config` within the dictionary or namespace object
 `PLUGINLIB_CONFIG`; for example:
 
-    PLUGINLIB_CONFIG = dict(
-        HANDLE_NOT_FOUND = "warn",
-        LOAD_VERBOSITY = 1,
-    )
+```python
+PLUGINLIB_CONFIG = dict(
+    HANDLE_NOT_FOUND = "warn",
+    LOAD_VERBOSITY = 1,
+)
+```
 
 The values specified in the top-level `config` override those in
 `korppluginlib.config`.
@@ -157,10 +159,11 @@ variables. The function returns an object containing configuration
 variables with their values (an instance of `types.SimpleNamespace`).
 For example:
 
-    pluginconf = korppluginlib.get_plugin_config(
-        CONFIG_VAR = "value",
-    )
-
+```python
+pluginconf = korppluginlib.get_plugin_config(
+    CONFIG_VAR = "value",
+)
+```
 The configured value of `CONFIG_VAR` can be then accessed as
 `pluginconf.CONFIG_VAR`. Once the plugin has been loaded, other
 plugins can also access it as
@@ -196,23 +199,27 @@ Plugin information should contain values for at least the keys
 needed. The first three are shown in the plugin load message if
 defined (and if `LOAD_VERBOSITY` is at least 1). For example:
 
-    PLUGIN_INFO = {
-        "name": "korppluginlib_test_1",
-        "version": "0.1",
-        "date": "2020-12-10",
-        "description": "korppluginlib test plugin 1",
-        "author": "FIN-CLARIN",
-        "author_email": "fin-clarin at helsinki dot fi",
-    }
+```python
+PLUGIN_INFO = {
+    "name": "korppluginlib_test_1",
+    "version": "0.1",
+    "date": "2020-12-10",
+    "description": "korppluginlib test plugin 1",
+    "author": "FIN-CLARIN",
+    "author_email": "fin-clarin at helsinki dot fi",
+}
+```
 
 Or equivalently in an `info` module:
 
-    NAME = "korppluginlib_test_1"
-    VERSION = "0.1"
-    DATE = "2020-12-10"
-    DESCRIPTION = "korppluginlib test plugin 1"
-    AUTHOR = "FIN-CLARIN"
-    AUTHOR_EMAIL = "fin-clarin at helsinki dot fi"
+```python
+NAME = "korppluginlib_test_1"
+VERSION = "0.1"
+DATE = "2020-12-10"
+DESCRIPTION = "korppluginlib test plugin 1"
+AUTHOR = "FIN-CLARIN"
+AUTHOR_EMAIL = "fin-clarin at helsinki dot fi"
+```
 
 The information on loaded plugins is accessible in the variable
 `korppluginlib.loaded_plugins`. Its value is an `OrderedDict` whose
@@ -232,22 +239,28 @@ To implement a new WSGI endpoint, you first create an instance of
 `korppluginlib.KorpEndpointPlugin` (a subclass of `flask.Blueprint`)
 as follows:
 
-    test_plugin = korppluginlib.KorpEndpointPlugin()
+```python
+test_plugin = korppluginlib.KorpEndpointPlugin()
+```
 
 You can also specify a name for the plugin, overriding the default
 that is the calling module name `__name__`:
 
-    test_plugin = korppluginlib.KorpEndpointPlugin("test_plugin")
+```python
+test_plugin = korppluginlib.KorpEndpointPlugin("test_plugin")
+```
 
 You may also pass other arguments recognized by `flask.Blueprint`.
 
 The actual view function is a generator function decorated with the
 `route` method of the created instance; for example:
 
-    @test_plugin.route("/test", extra_decorators=["prevent_timeout"])
-    def test(args):
-        """Yield arguments wrapped in "args"."""
-        yield {"args": args}
+```python
+@test_plugin.route("/test", extra_decorators=["prevent_timeout"])
+def test(args):
+    """Yield arguments wrapped in "args"."""
+    yield {"args": args}
+```
 
 The decorator takes as its arguments the route of the endpoint, and
 optionally, an iterable of the names of possible additional decorators
@@ -279,17 +292,19 @@ For example, the following endpoint returns an attachment for a
 plain-text file listing the arguments to the endpoint, named with the
 value of `filename` (`args.txt` if not specified):
 
-    @test_plugin.route("/text", extra_decorators=["use_custom_headers"])
-    def textfile(args):
-        """Make downloadable plain-text file of args."""
-        yield {
-            "content": "\n".join(arg + "=" + repr(args[arg]) for arg in args),
-            "mimetype": "text/plain",
-            "headers": [
-                ("Content-Disposition",
-                 "attachment; filename=\"" + args.get("filename", "args.txt")
-                 + "\"")]
-        }
+```python
+@test_plugin.route("/text", extra_decorators=["use_custom_headers"])
+def textfile(args):
+    """Make downloadable plain-text file of args."""
+    yield {
+        "content": "\n".join(arg + "=" + repr(args[arg]) for arg in args),
+        "mimetype": "text/plain",
+        "headers": [
+            ("Content-Disposition",
+             "attachment; filename=\"" + args.get("filename", "args.txt")
+             + "\"")]
+    }
+```
 
 Note that neither the endpoint argument `incremental=true` nor the
 decorator `prevent_timeout` has any practical effect on endpoints with
@@ -305,17 +320,19 @@ decorated with `main_handler` as the topmost decorator. However,
 additional decorator functions can be defined by decorating them with
 `korppluginlib.KorpEndpointPlugin.endpoint_decorator`; for example:
 
-    # test_plugin is an instance of korppluginlib.KorpEndpointPlugin, so this
-    # is equivalent to @korppluginlib.KorpEndpointPlugin.endpoint_decorator
-    @test_plugin.endpoint_decorator
-    def test_decor(generator):
-        """Add to the result an extra layer with text_decor and payload."""
-        @functools.wraps(generator)
-        def decorated(args=None, *pargs, **kwargs):
-            for x in generator(args, *pargs, **kwargs):
-                yield {"test_decor": "Endpoint decorated with test_decor",
-                       "payload": x}
-        return decorated
+```python
+# test_plugin is an instance of korppluginlib.KorpEndpointPlugin, so this
+# is equivalent to @korppluginlib.KorpEndpointPlugin.endpoint_decorator
+@test_plugin.endpoint_decorator
+def test_decor(generator):
+    """Add to the result an extra layer with text_decor and payload."""
+    @functools.wraps(generator)
+    def decorated(args=None, *pargs, **kwargs):
+        for x in generator(args, *pargs, **kwargs):
+            yield {"test_decor": "Endpoint decorated with test_decor",
+                   "payload": x}
+    return decorated
+```
 
 
 ## Callback plugins
@@ -384,6 +401,20 @@ the following:
   `sql` to be passed to the MySQL/MariaDB database server and returns
   the modified value.
 
+- `filter_protected_corpora(self, protected_corpora, request)`:
+  Modifies (or replaces) the list `protected_corpora` of ids of
+  protected corpora, the use of which requires authentication and
+  authorization.
+
+- `filter_auth_postdata(self, postdata, request)`: Modifies (or
+  replaces) the POST request parameters in `postdata`, to be passed to
+  the authorization server (`config.AUTH_SERVER`) in the endpoint
+  `/authenticate`.
+
+- `filter_auth_response(self, auth_response, request)`: Modifies the
+  response `auth_response` returned by the authorization server in the
+  endpoint `/authenticate`.
+
 
 ### Event hook points
 
@@ -416,12 +447,14 @@ following:
 An example of a callback plugin containing a callback method to be
 called at the hook point `filter_result`:
 
-    class Test1b(korppluginlib.KorpCallbackPlugin):
+```python
+class Test1b(korppluginlib.KorpCallbackPlugin):
 
-        def filter_result(self, result, request):
-            """Wrap the result dictionary in "wrap" and add "endpoint"."""
-            return {"endpoint": request.endpoint,
-                    "wrap": result}
+    def filter_result(self, result, request):
+        """Wrap the result dictionary in "wrap" and add "endpoint"."""
+        return {"endpoint": request.endpoint,
+                "wrap": result}
+```
 
 
 ### Notes on implementing a callback plugin
@@ -459,21 +492,23 @@ point) should initialize a space for the data for a request, and
 `exit_handler` (called at the last hook point) should delete it. For
 example:
 
-    from types import SimpleNamespace
+```python
+from types import SimpleNamespace
 
-    class StateTest(korppluginlib.KorpCallbackPlugin):
+class StateTest(korppluginlib.KorpCallbackPlugin):
 
-        _data = {}
+    _data = {}
 
-        def enter_handler(self, args, starttime, request):
-            self._data[request] = data = SimpleNamespace()
-            data.starttime = starttime
-            print("enter_handler, starttime =", starttime)
+    def enter_handler(self, args, starttime, request):
+        self._data[request] = data = SimpleNamespace()
+        data.starttime = starttime
+        print("enter_handler, starttime =", starttime)
 
-        def exit_handler(self, endtime, elapsed, request):
-            print("exit_handler, starttime =", self._data[request].starttime,
-                  "endtime =", endtime)
-            del self._data[request]
+    def exit_handler(self, endtime, elapsed, request):
+        print("exit_handler, starttime =", self._data[request].starttime,
+              "endtime =", endtime)
+        del self._data[request]
+```
 
 This works in part because the `request` argument of the callback
 methods is the actual Flask request object, not the global proxy.
@@ -483,24 +518,28 @@ methods is the actual Flask request object, not the global proxy.
 
 In addition to the hook points in `korp.py` listed above, you can
 define hook points in plugins by invoking callbacks with the name of
-the hook point by using special call methods. For example, a logging
-plugin could implement a callback method `log` that could be called
-from other plugins, both callback and endpoint plugins.
+the hook point by using the appropriate methods. For example, a
+logging plugin could implement a callback method `log` that could be
+called from other plugins, both callback and endpoint plugins.
 
 Given the Flask request object (or the global request proxy)
 `request`, callbacks for the (event) hook point `hook_point` can be
 called as follows, with `*args` and `**kwargs` as the positional and
 keyword arguments and discarding the return value:
 
-    korppluginlib.KorpCallbackPluginCaller.call_for_request(
-        "hook_point", *args, request, **kwargs)
+```python
+korppluginlib.KorpCallbackPluginCaller.raise_event_for_request(
+    "hook_point", *args, request, **kwargs)
+```
 
 or, equivalently, getting a caller object for a request and calling
 its instance method (typically when the same function or method
 contains several hook points):
 
-    plugin_caller = korppluginlib.KorpCallbackPluginCaller.get_instance(request)
-    plugin_caller.call("hook_point", *args, **kwargs)
+```python
+plugin_caller = korppluginlib.KorpCallbackPluginCaller.get_instance(request)
+plugin_caller.raise_event("hook_point", *args, **kwargs)
+```
 
 If `request` is omitted or `None`, the request object referred to by
 the global request proxy is used.
@@ -509,7 +548,9 @@ Callbacks for such additional hook points are defined in the same way
 as for those in `korp.py`. The signature corresponding to the above
 calls is
 
-    hook_point(self, *args, request, **kwargs)
+```python
+hook_point(self, *args, request, **kwargs)
+```
 
 (where `*args` should be expanded to the actual positional arguments).
 All callback methods need to have request as the last positional
@@ -517,16 +558,16 @@ argument.
 
 Three types of call methods are available in KorpCallbackPluginCaller:
 
-- `call_for_request` (and instance method `call`): Call the callback
-  methods and discard their possible return values (for event hook
-  points).
+- `raise_event_for_request` (and instance method `raise_event`): Call
+  the callback methods and discard their possible return values (for
+  event hook points).
 
-- `call_chain_for_request` (and `call_chain`): Call the callback
+- `filter_value_for_request` (and `filter_value`): Call the callback
   methods and pass the return value as the first argument of the next
   callback method, and return the value returned by the last callback
   emthod (for filter hook points).
 
-- `call_collect_for_request` (and `call_collect`): Call the callback
+- `get_values_for_request` (and `get_values`): Call the callback
   methods, collect their return values to a list and finally return
   the list.
 
