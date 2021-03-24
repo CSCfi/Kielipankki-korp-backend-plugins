@@ -73,9 +73,16 @@ def auth():
         args = request.values.to_dict()
     # Should the arguments and result be logged at the level info or debug?
     logging.info("Arguments: %s", args)
-    result = _get_permitted_resources(
+    corpora = _get_permitted_resources(
         *(args.get(key, "") for key in [
             "remote_user", "affiliation", "entitlement"]))
+    # If "format=short", use the old format with corpora as a list, instead of
+    # the new (default) one with corpora as a dict with values {"read": True}.
+    if args.get("format") != "short":
+        corpora = dict((corpus, {"read": True}) for corpus in corpora)
+    result = dict(authenticated=True,
+                  permitted_resources=dict(username=args.get("remote_user"),
+                                           corpora=corpora))
     logging.info("Result: %s", result)
     return Response(json.dumps(result), mimetype="application/json")
 
@@ -169,9 +176,7 @@ def _get_permitted_resources(username, affiliation, entitlement):
     corpora = [corpus.upper() for corpus, in cursor]
     logging.info("Corpora: %s", corpora)
 
-    return dict(authenticated=True,
-                permitted_resources=dict(username=username,
-                                         corpora=corpora))
+    return corpora
 
 
 if __name__ == "__main__":
