@@ -1,0 +1,26 @@
+
+"""
+config.py (template)
+
+Sample configuration for the auth WSGI script.
+"""
+
+
+# For log levels
+import logging
+
+
+# Host and port for the WSGI server
+WSGI_HOST = "localhost"
+WSGI_PORT = 1235
+
+# Authorization database host, port, user, password and name
+DBHOST = "0.0.0.0"
+DBPORT = 3306
+DBUSER = "korp"
+DBPASSWORD = ""
+DBNAME = "korp_auth"
+
+# Log file and level
+LOG_FILE = "/v/korp/log/korp-auth.log"
+LOG_LEVEL = logging.INFO    # in non-logging version, WARNING
