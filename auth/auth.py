@@ -11,35 +11,24 @@ authentication was removed.
 """
 
 
-# The following has been copied from korp.py, but not all that may be necessary
-# here, in particular if the script is run in a single thread.
+# Support asynchronicity by using gevent. But is that needed here? The
+# following has been copied from korp.py
 
 # Skip monkey patching if run through gunicorn (which does the patching for us)
 import os
 if "gunicorn" not in os.environ.get("SERVER_SOFTWARE", ""):
     from gevent import monkey
     # Patching needs to be done as early as possible, before other imports
-    monkey.patch_all(subprocess=False)
+    monkey.patch_all()
 
 from gevent.pywsgi import WSGIServer
-from gevent.threadpool import ThreadPool
-from gevent.queue import Queue, Empty
-
-# gunicorn patches everything, and gevent's subprocess module can't be
-# used in native threads other than the main one, so we need to
-# un-patch the subprocess module.
-from importlib import reload
-import subprocess
-reload(subprocess)
-
 
 import sys
 import json
 import MySQLdb
 import logging
 
-from flask import (Flask, request, Response, stream_with_context,
-                   copy_current_request_context)
+from flask import Flask, request, Response
 from flask_mysqldb import MySQL
 from flask_cors import CORS
 
