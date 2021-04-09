@@ -60,6 +60,12 @@ def auth():
         args = request.get_json()
     else:
         args = request.values.to_dict()
+    # If the value of the argument "debug" is 1, "true" or "yes", use log level
+    # DEBUG, else INFO. Note that logging.INFO needs to be set explicitly to
+    # cancel the effect of a possible previous debugging argument.
+    debugging = args.get("debug", "").lower() in ["1", "true", "yes"]
+    logging.getLogger().setLevel(
+        logging.DEBUG if debugging else config.LOG_LEVEL)
     # Should the arguments and result be logged at the level info or debug?
     logging.info("Arguments: %s", args)
     corpora = _get_permitted_resources(
