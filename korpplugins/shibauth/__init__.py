@@ -48,24 +48,30 @@ class ShibbolethAuthorizer(korppluginlib.KorpCallbackPlugin):
             """Get the value of env variable key or the corresponding header.
 
             If the environment variable `key` does not exist or is
-            empty, try the corresponding HTTP headers X-Key and Key,
-            where Key is title-cased and with the possible "HTTP_"
-            prefix removed.
+            empty and its name begins with "HTTP_", first try the
+            environment variable without the "HTTP_" prefix. Then try
+            the corresponding HTTP headers X-Key and Key, where Key is
+            title-cased and with the possible "HTTP_" prefix removed.
             """
             value = request.environ.get(key)
             if not value:
-                # Try to get a value from HTTP headers
                 if key.startswith("HTTP_"):
                     key = key[5:]
-                key = key.replace("_", "-").title()
-                value = (request.headers.get("X-" + key)
-                         or request.headers.get(key)
-                         or "")
+                    value = request.environ.get(key)
+                # Try to get a value from HTTP headers
+                if not value:
+                    key = key.replace("_", "-").title()
+                    value = (request.headers.get("X-" + key)
+                             or request.headers.get(key)
+                             or "")
             return value
 
-        remote_user = get_value("REMOTE_USER")
+        # Apache seems to pass the remote user information in the environment
+        # variable HTTP_REMOTE_USER
+        remote_user = get_value("HTTP_REMOTE_USER")
         # Save the username to be added to the result in filter_result
         self._username[request] = remote_user
+        # print("remote user:", remote_user)
         if remote_user:
             # In which order should we check the affiliation variables?
             affiliation = (get_value("HTTP_UNSCOPED_AFFILIATION") or
@@ -76,4 +82,5 @@ class ShibbolethAuthorizer(korppluginlib.KorpCallbackPlugin):
                 "affiliation": affiliation.lower(),
                 "entitlement": entitlement,
             }
+        # print("postdata:", postdata)
         return postdata
