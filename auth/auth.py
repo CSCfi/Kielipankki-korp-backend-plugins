@@ -159,7 +159,7 @@ def _get_permitted_resources(username, affiliation, entitlement):
 
     # Finally fill in entitlement values
     sql = sql % entitlement
-    logging.debug("SQL: %s", sql)
+    logging.debug("SQL: %r", sql)
 
     cursor.execute(sql)
     corpora = [corpus.upper() for corpus, in cursor]
