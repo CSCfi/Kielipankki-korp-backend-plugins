@@ -17,6 +17,23 @@ class ShibbolethAuthorizer(korppluginlib.KorpCallbackPlugin):
 
     """A Korp callback plugin for authentication handling Shibboleth info"""
 
+    # dict to map requests to usernames, for saving a username in
+    # filter_auth_postdata to be added to the result in filter_result, as
+    # expected by the frontend (plugin).
+    _username = {}
+
+    def exit_handler(self, endtime, elapsed, request):
+        """Remove request username at the end of handling the request."""
+        if request in self._username:
+            del self._username[request]
+
+    def filter_result(self, result, request):
+        """Add "username" to the result of /authenticate."""
+        # Note: You cannot specify method applies_to() to restrict to
+        # /authenticate, as also other endpoints call authenticate internally.
+        if request.endpoint == "authenticate":
+            result["username"] = self._username.get(request)
+
     def filter_auth_postdata(self, postdata, request):
         """If REMOTE_USER is set, return postdata with Shibboleth info.
 
@@ -47,6 +64,8 @@ class ShibbolethAuthorizer(korppluginlib.KorpCallbackPlugin):
             return value
 
         remote_user = get_value("REMOTE_USER")
+        # Save the username to be added to the result in filter_result
+        self._username[request] = remote_user
         if remote_user:
             # In which order should we check the affiliation variables?
             affiliation = (get_value("HTTP_UNSCOPED_AFFILIATION") or
