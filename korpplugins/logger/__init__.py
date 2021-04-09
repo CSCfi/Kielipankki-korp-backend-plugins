@@ -255,7 +255,7 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
 
         This general logging method can be called from other plugins
         via
-        korppluginlib.KorpCallbackPluginCaller.call_for_request("log",
+        korppluginlib.KorpCallbackPluginCaller.raise_event_for_request("log",
         ...) whenever they wish to log something.
         """
         logger = KorpLogger._get_logger(request)
