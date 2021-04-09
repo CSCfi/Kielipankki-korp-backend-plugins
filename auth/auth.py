@@ -168,15 +168,18 @@ def _get_permitted_resources(username, affiliation, entitlement):
     return corpora
 
 
+# Set up logging here and not inside 'if __name__ == "__main__"', so
+# that it will also be used when running under Gunicorn.
+# Logging in this way may result in mixed lines if multiple instances
+# of the auth application are run simultaneously. However, it might
+# suffice to run a single instance at a time.
+logging.basicConfig(
+    filename=config.LOG_FILE,
+    format=("[auth.py %(levelname)s %(process)d @ %(asctime)s] %(message)s"),
+    level=config.LOG_LEVEL)
+
+
 if __name__ == "__main__":
-    # Logging in this way may result in mixed lines if multiple instances of
-    # the auth application are run simultaneously. However, it might suffice to
-    # run a single instance at a time.
-    logging.basicConfig(
-        filename=config.LOG_FILE,
-        format=("[auth.py %(levelname)s %(process)d @ %(asctime)s] "
-                "%(message)s"),
-        level=config.LOG_LEVEL)
     if len(sys.argv) == 2 and sys.argv[1] == "dev":
         # Run using Flask (use only for development)
         app.run(debug=True, threaded=True,
