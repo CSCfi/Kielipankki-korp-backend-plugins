@@ -66,7 +66,6 @@ def auth():
     debugging = args.get("debug", "").lower() in ["1", "true", "yes"]
     logging.getLogger().setLevel(
         logging.DEBUG if debugging else config.LOG_LEVEL)
-    # Should the arguments and result be logged at the level info or debug?
     logging.info("Arguments: %s", args)
     corpora = _get_permitted_resources(
         *(args.get(key, "") for key in [
@@ -108,7 +107,7 @@ def _get_permitted_resources(username, affiliation, entitlement):
     Shibboleth and entitlement contains LBR REMS IDs (URNs) as a
     semicolon separated list.
     """
-    logging.info("Username: %s", username)
+    logging.debug("Username: %s", username)
     if not username:
         return dict(authenticated=False)
 
@@ -169,7 +168,7 @@ def _get_permitted_resources(username, affiliation, entitlement):
 
     cursor.execute(sql)
     corpora = [corpus.upper() for corpus, in cursor]
-    logging.info("Corpora: %s", corpora)
+    logging.debug("Corpora: %s", corpora)
 
     return corpora
 
