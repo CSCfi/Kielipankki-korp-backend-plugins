@@ -248,9 +248,15 @@ def prevent_timeout(generator):
 
 def parse_corpora(args):
     corpora = args.get("corpus", [])
+    sort = parse_bool(args, "sort_corpora", config.SORT_CORPORA_DEFAULT)
     if isinstance(corpora, str):
         corpora = corpora.upper().split(QUERY_DELIM)
-    return sorted(set(corpora))
+    if sort:
+        return sorted(set(corpora))
+    else:
+        # Unique elements, keeping order: https://stackoverflow.com/a/480227
+        seen = set()
+        return [c for c in corpora if not (c in seen or seen.add(c))]
 
 
 def parse_within(args):
