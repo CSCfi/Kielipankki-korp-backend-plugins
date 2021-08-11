@@ -3492,6 +3492,8 @@ def assert_key(key, attrs, regexp, required=False):
                 break
     else:
         value = attrs.get(key, "")
+        if isinstance(value, bool):
+            value = str(value).lower()
         key = (key,)
     if value and not isinstance(value, list):
         value = [value]
@@ -3588,10 +3590,11 @@ def generator_to_dict(generator):
 
 
 def parse_bool(args, key, default=True):
+    argval = str(args.get(key, "")).lower()
     if default:
-        return args.get(key, "").lower() != "false"
+        return argval != "false"
     else:
-        return args.get(key, "").lower() == "true"
+        return argval == "true"
 
 
 class CustomTracebackException(Exception):
