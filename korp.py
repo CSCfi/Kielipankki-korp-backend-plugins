@@ -89,6 +89,7 @@ app.config["MYSQL_USER"] = config.DBUSER
 app.config["MYSQL_PASSWORD"] = config.DBPASSWORD
 app.config["MYSQL_DB"] = config.DBNAME
 app.config["MYSQL_PORT"] = config.DBPORT
+app.config["MYSQL_CHARSET"] = config.DBCHARSET
 app.config["MYSQL_USE_UNICODE"] = True
 app.config["MYSQL_CURSORCLASS"] = "DictCursor"
 mysql = MySQL(app)
