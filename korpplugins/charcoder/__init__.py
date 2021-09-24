@@ -113,16 +113,17 @@ class SpecialCharacterTranscoder(korppluginlib.KorpCallbackPlugin):
 
     def filter_result(self, result, *rest):
         """Decode special characters in result"""
-        return self._transcode_strings(result, _decode_special_chars)
+        return self._transcode_strings(result, _decode_special_chars, keys=True)
 
-    def _transcode_strings(self, obj, transfunc, argname_prefix=None):
+    def _transcode_strings(self, obj, transfunc, keys=False,
+                           argname_prefix=None):
         """Return obj with strings transcoded using transfunc
 
         Transcode strings and recursively string values in a dict or
-        list (dict keys are not transcoded); all other types of
-        objects are kept intact. If argname_prefix is not None and obj
-        is a dict, transcode only the values of keys beginning with
-        argname_prefix.
+        list; all other types of objects are kept intact. Transcode
+        dict keys only if keys is True. If argname_prefix is not None
+        and obj is a dict, transcode only the values of keys beginning
+        with argname_prefix.
         """
         if isinstance(obj, str):
             return transfunc(obj)
@@ -130,7 +131,13 @@ class SpecialCharacterTranscoder(korppluginlib.KorpCallbackPlugin):
         try:
             for key, val in obj.items():
                 if argname_prefix is None or key.startswith(argname_prefix):
-                    obj[key] = self._transcode_strings(val, transfunc)
+                    obj[key] = self._transcode_strings(
+                        val, transfunc, keys=keys)
+                    if keys:
+                        new_key = transfunc(key)
+                        if new_key != key:
+                            obj[new_key] = obj[key]
+                            del obj[key]
             return obj
         except AttributeError:
             pass
@@ -138,7 +145,8 @@ class SpecialCharacterTranscoder(korppluginlib.KorpCallbackPlugin):
         try:
             result = []
             for val in obj:
-                result.append(self._transcode_strings(val, transfunc))
+                result.append(self._transcode_strings(
+                    val, transfunc, keys=keys))
             return result
         except TypeError:
             pass
