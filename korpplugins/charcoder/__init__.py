@@ -87,19 +87,19 @@ def _decode_special_chars(s):
 
 
 def _encode_special_chars_in_query(cqp):
-    """Encode the special characters in the double-quoted substrings
-    of the CQP query cqp.
+    """Encode the special characters in the single- or double-quoted
+    substrings of the CQP query cqp.
     """
-    # Allow empty strings within double quotes, so that the regexp
-    # does not match from an ending double quote of a quoted empty
-    # string to the next double quote.
-    return re.sub(r'("(?:[^\\"]|\\.)*")',
+    # Allow empty strings within quotation marks, so that the regexp
+    # does not match from an ending quotation mark of a quoted empty
+    # string to the next quotation mark.
+    return re.sub(r"""("(?:[^\\"]|\\.)*"|'(?:[^\\']|\\.)*')""",
                   lambda mo: _encode_special_chars(mo.group(0)), cqp)
 
 
 def _encode_special_chars_in_queries(cqp_list):
-    """Encode the special characters in the double-quoted substrings
-    of the list of CQP queryies cqp_list.
+    """Encode the special characters in the single- or double-quoted
+    substrings of the list of CQP queryies cqp_list.
     """
     return [_encode_special_chars_in_query(cqp) for cqp in cqp_list]
 
