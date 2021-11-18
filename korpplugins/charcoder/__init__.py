@@ -129,6 +129,10 @@ class SpecialCharacterTranscoder(korppluginlib.KorpCallbackPlugin):
             return transfunc(obj)
         # dict
         try:
+            # Collect keys to be replaced to a list of pairs (original key,
+            # transcoded key) and replace them after iterating over the dict,
+            # as replacing during iteration may lead to skipping some keys.
+            replaced_keys = []
             for key, val in obj.items():
                 if argname_prefix is None or key.startswith(argname_prefix):
                     obj[key] = self._transcode_strings(
@@ -136,8 +140,10 @@ class SpecialCharacterTranscoder(korppluginlib.KorpCallbackPlugin):
                     if keys:
                         new_key = transfunc(key)
                         if new_key != key:
-                            obj[new_key] = obj[key]
-                            del obj[key]
+                            replaced_keys.append((key, new_key))
+            for key, new_key in replaced_keys:
+                obj[new_key] = obj[key]
+                del obj[key]
             return obj
         except AttributeError:
             pass
