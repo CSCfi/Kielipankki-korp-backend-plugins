@@ -109,21 +109,22 @@ class SpecialCharacterTranscoder(korppluginlib.KorpCallbackPlugin):
     def filter_args(self, args, request):
         """Encode special characters in CQP queries"""
         return self._transcode_strings(
-            args, _encode_special_chars_in_query, argname_prefix='cqp')
+            args, _encode_special_chars_in_query,
+            argname_filter=lambda key: "cqp" in key)
 
     def filter_result(self, result, *rest):
         """Decode special characters in result"""
         return self._transcode_strings(result, _decode_special_chars, keys=True)
 
     def _transcode_strings(self, obj, transfunc, keys=False,
-                           argname_prefix=None):
+                           argname_filter=None):
         """Return obj with strings transcoded using transfunc
 
         Transcode strings and recursively string values in a dict or
         list; all other types of objects are kept intact. Transcode
-        dict keys only if keys is True. If argname_prefix is not None
-        and obj is a dict, transcode only the values of keys beginning
-        with argname_prefix.
+        dict keys only if keys is True. If argname_filter is not None
+        and obj is a dict, transcode only the values of the keys for
+        which the function argname_filter returns True.
         """
         if isinstance(obj, str):
             return transfunc(obj)
@@ -134,7 +135,7 @@ class SpecialCharacterTranscoder(korppluginlib.KorpCallbackPlugin):
             # as replacing during iteration may lead to skipping some keys.
             replaced_keys = []
             for key, val in obj.items():
-                if argname_prefix is None or key.startswith(argname_prefix):
+                if argname_filter is None or argname_filter(key):
                     obj[key] = self._transcode_strings(
                         val, transfunc, keys=keys)
                     if keys:
