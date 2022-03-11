@@ -18,6 +18,7 @@ The separate files can be concatenated later manually.
 """
 
 
+import hashlib
 import logging
 import os
 import os.path
@@ -202,10 +203,12 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         # Log user information (Shibboleth authentication only). How could we
         # make this depend on using a Shibboleth plugin?
         if KorpLogger._log_category("auth"):
-            remote_user = request.remote_user
+            self._log(logger.info, "auth", "Env", env)
+            # request.remote_user doesn't seem to work here
+            remote_user = env["HTTP_REMOTE_USER"]
             if remote_user:
                 auth_domain = remote_user.partition("@")[2]
-                auth_user = md5.new(remote_user).hexdigest()
+                auth_user = hashlib.md5(remote_user.encode()).hexdigest()
             else:
                 auth_domain = auth_user = None
             self._log(logger.info, "auth", "Auth-domain", auth_domain)
