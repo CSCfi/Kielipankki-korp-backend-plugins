@@ -184,7 +184,9 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         """Initialize logging at entering Korp and log basic information"""
         logger = self._init_logging(request, starttime, args)
         env = request.environ
-        self._log(logger.info, "userinfo", "IP", request.remote_addr)
+        # request.remote_addr is localhost when behind proxy, so get the
+        # originating IP from request.access_route
+        self._log(logger.info, "userinfo", "IP", request.access_route[0])
         self._log(logger.info, "userinfo", "User-agent", request.user_agent)
         self._log(logger.info, "referrer", "Referrer", request.referrer)
         # request.script_root is empty; how to get the name of the
