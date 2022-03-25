@@ -205,7 +205,11 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         if KorpLogger._log_category("auth"):
             self._log(logger.info, "auth", "Env", env)
             # request.remote_user doesn't seem to work here
-            remote_user = env["HTTP_REMOTE_USER"]
+            try:
+                remote_user = env["HTTP_REMOTE_USER"]
+            except KeyError:
+                # HTTP_REMOTE_USER is usually empty, but sometimes missing
+                remote_user = None
             if remote_user:
                 auth_domain = remote_user.partition("@")[2]
                 auth_user = hashlib.md5(remote_user.encode()).hexdigest()
