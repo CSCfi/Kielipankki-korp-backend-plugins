@@ -151,6 +151,11 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         self._loggers[request_id] = logger
         return logger
 
+    def _end_logging(self, request):
+        """End logging for a request; called once per request in exit_handler"""
+        request_id = KorpLogger._get_request_id(request)
+        del self._loggers[request_id]
+
     def _log(self, log_fn, category, item, value):
         """Log item in category with value using function log_fn
 
@@ -231,7 +236,7 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         self._log(logger.info, "times", "CPU-times",
                   " ".join(str(val) for val in os.times()[:4]))
         self._log(logger.info, "times", "Elapsed", elapsed_time)
-        del self._loggers[KorpLogger._get_request_id(request)]
+        self._end_logging(request)
 
     def filter_result(self, result, request):
         """Debug log the result (request response)
