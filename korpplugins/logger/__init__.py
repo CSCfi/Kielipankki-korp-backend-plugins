@@ -255,9 +255,22 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         self._log(logger.debug, "debug", "Result", result)
 
     def filter_cqp_input(self, cqp, request):
-        """Debug log CQP input cqp"""
+        """Debug log CQP input cqp and save start time"""
         logger = KorpLogger._get_logger(request)
+        request_id = KorpLogger._get_request_id(request)
         self._log(logger.debug, "debug", "CQP", cqp)
+        self._logdata[request_id]["cqp_start_time"] = time.time()
+
+    def filter_cqp_output(self, output, request):
+        """Debug log CQP output length and time spent in CQP"""
+        cqp_end_time = time.time()
+        logger = KorpLogger._get_logger(request)
+        # output is a pair (result, error): log the length of both
+        self._log(logger.debug, "debug", "CQP-output-length",
+                  " ".join(str(len(val)) for val in output))
+        request_id = KorpLogger._get_request_id(request)
+        self._log(logger.debug, "debug", "CQP-time",
+                  cqp_end_time - self._logdata[request_id]["cqp_start_time"])
 
     def filter_sql(self, sql, request):
         """Debug log SQL statements sql"""
