@@ -129,6 +129,8 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         handler = logging.FileHandler(logfile)
         handler.setFormatter(logging.Formatter(pluginconf.LOG_FORMAT))
         self._logger.addHandler(handler)
+        # Storage for request-specific data, such as start times
+        self._logdata = dict()
 
     # Helper methods
 
@@ -149,12 +151,14 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
             },
             loglevel)
         self._loggers[request_id] = logger
+        self._logdata[request_id] = dict()
         return logger
 
     def _end_logging(self, request):
         """End logging for a request; called once per request in exit_handler"""
         request_id = KorpLogger._get_request_id(request)
         del self._loggers[request_id]
+        del self._logdata[request_id]
 
     def _log(self, log_fn, category, item, value):
         """Log item in category with value using function log_fn
