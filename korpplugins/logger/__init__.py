@@ -160,17 +160,22 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         del self._loggers[request_id]
         del self._logdata[request_id]
 
-    def _log(self, log_fn, category, item, value):
-        """Log item in category with value using function log_fn
+    def _log(self, log_fn, category, item, *values, format=None):
+        """Log item in category with values using function log_fn and format
 
         Do not log if pluginconf.LOG_CATEGORIES is not None and it
         does not contain category, or if pluginconf.LOG_EXCLUDE_ITEMS
         contains item.
+
+        If multiple values are given, each of them gets the format
+        specifier "%s", separated by spaces, unless format is
+        explicitly specified.
         """
-        # TODO: Make the log message format configurable
         if (KorpLogger._log_category(category)
                 and item not in pluginconf.LOG_EXCLUDE_ITEMS):
-            log_fn(item + ": %s", value)
+            if format is None:
+                format = " ".join(len(values) * ("%s",))
+            log_fn(item + ": " + format, *values)
 
     @staticmethod
     def _get_request_id(request):
