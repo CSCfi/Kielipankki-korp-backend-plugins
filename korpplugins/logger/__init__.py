@@ -215,6 +215,7 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
     def enter_handler(self, args, starttime, request):
         """Initialize logging at entering Korp and log basic information"""
         logger = self._init_logging(request, starttime, args)
+        self._set_logdata(request, "cpu_times_start", os.times()[:4])
         env = request.environ
         # request.remote_addr is localhost when behind proxy, so get the
         # originating IP from request.access_route
@@ -260,8 +261,16 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
                   self._get_logdata(request, "cqp_time_sum"))
         self._log(logger.info, "load", "CPU-load", *os.getloadavg())
         # FIXME: The CPU times probably make little sense, as the WSGI server
-        # handles multiple requests in a single process
-        self._log(logger.info, "times", "CPU-times", *(os.times()[:4]))
+        # handles multiple requests in a single process. However, does CPU
+        # times difference make any more sense?
+        cpu_times_start = self._get_logdata(request, "cpu_times_start")
+        cpu_times_end = os.times()[:4]
+        self._log(logger.info, "times", "CPU-times", *cpu_times_end)
+        # The difference of CPU times at the beginning and end of the request
+        # TODO: Round the values
+        cpu_times_diff = tuple(cpu_times_end[i] - cpu_times_start[i]
+                               for i in range(len(cpu_times_start)))
+        self._log(logger.info, "times", "CPU-times-diff", *cpu_times_diff)
         self._log(logger.info, "times", "Elapsed", elapsed_time)
         self._end_logging(request)
 
