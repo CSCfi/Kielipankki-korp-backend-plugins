@@ -160,6 +160,23 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         del self._loggers[request_id]
         del self._logdata[request_id]
 
+    def _get_logdata(self, request, key, default=None):
+        """Get the request-specific log data item for key (with default)"""
+        return self._logdata[KorpLogger._get_request_id(request)].get(
+            key, default)
+
+    def _set_logdata(self, request, key, value, default=None):
+        """Set the request-specific log data item key to value.
+
+        If value is a function (of one argument), set the value to the
+        return value of the function called with the existing value
+        (or default if the values does not exist.
+        """
+        request_id = KorpLogger._get_request_id(request)
+        if callable(value):
+            value = value(self._logdata[request_id].get(key, default))
+        self._logdata[request_id][key] = value
+
     def _log(self, log_fn, category, item, *values, format=None):
         """Log item in category with values using function log_fn and format
 
@@ -260,20 +277,17 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
     def filter_cqp_input(self, cqp, request):
         """Debug log CQP input cqp and save start time"""
         logger = KorpLogger._get_logger(request)
-        request_id = KorpLogger._get_request_id(request)
         self._log(logger.debug, "debug", "CQP", cqp)
-        self._logdata[request_id]["cqp_start_time"] = time.time()
+        self._set_logdata(request, "cqp_start_time",  time.time())
 
     def filter_cqp_output(self, output, request):
         """Debug log CQP output length and time spent in CQP"""
-        cqp_end_time = time.time()
+        cqp_time = time.time() - self._get_logdata(request, "cqp_start_time")
         logger = KorpLogger._get_logger(request)
         # output is a pair (result, error): log the length of both
         self._log(logger.debug, "debug", "CQP-output-length",
                   *(len(val) for val in output))
-        request_id = KorpLogger._get_request_id(request)
-        self._log(logger.debug, "debug", "CQP-time",
-                  cqp_end_time - self._logdata[request_id]["cqp_start_time"])
+        self._log(logger.debug, "debug", "CQP-time", cqp_time)
 
     def filter_sql(self, sql, request):
         """Debug log SQL statements sql"""
