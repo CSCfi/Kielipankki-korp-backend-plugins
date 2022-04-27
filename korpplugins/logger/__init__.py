@@ -249,12 +249,15 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
             self._log(logger.info, "auth", "Auth-domain", auth_domain)
             self._log(logger.info, "auth", "Auth-user", auth_user)
         self._log(logger.debug, "env", "Env", env)
+        self._set_logdata(request, "cqp_time_sum", 0)
         # self._log(logger.debug, "env", "App",
         #           repr(korppluginlib.app_globals.app.__dict__))
 
     def exit_handler(self, endtime, elapsed_time, request):
         """Log information at exiting Korp"""
         logger = KorpLogger._get_logger(request)
+        self._log(logger.info, "times", "CQP-time-total",
+                  self._get_logdata(request, "cqp_time_sum"))
         self._log(logger.info, "load", "CPU-load", *os.getloadavg())
         # FIXME: The CPU times probably make little sense, as the WSGI server
         # handles multiple requests in a single process
@@ -288,6 +291,7 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         self._log(logger.debug, "debug", "CQP-output-length",
                   *(len(val) for val in output))
         self._log(logger.debug, "debug", "CQP-time", cqp_time)
+        self._set_logdata(request, "cqp_time_sum", lambda x: x + cqp_time, 0)
 
     def filter_sql(self, sql, request):
         """Debug log SQL statements sql"""
