@@ -238,12 +238,10 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
     def exit_handler(self, endtime, elapsed_time, request):
         """Log information at exiting Korp"""
         logger = KorpLogger._get_logger(request)
-        self._log(logger.info, "load", "CPU-load",
-                  " ".join(str(val) for val in os.getloadavg()))
+        self._log(logger.info, "load", "CPU-load", *os.getloadavg())
         # FIXME: The CPU times probably make little sense, as the WSGI server
         # handles multiple requests in a single process
-        self._log(logger.info, "times", "CPU-times",
-                  " ".join(str(val) for val in os.times()[:4]))
+        self._log(logger.info, "times", "CPU-times", *(os.times()[:4]))
         self._log(logger.info, "times", "Elapsed", elapsed_time)
         self._end_logging(request)
 
@@ -272,7 +270,7 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         logger = KorpLogger._get_logger(request)
         # output is a pair (result, error): log the length of both
         self._log(logger.debug, "debug", "CQP-output-length",
-                  " ".join(str(len(val)) for val in output))
+                  *(len(val) for val in output))
         request_id = KorpLogger._get_request_id(request)
         self._log(logger.debug, "debug", "CQP-time",
                   cqp_end_time - self._logdata[request_id]["cqp_start_time"])
