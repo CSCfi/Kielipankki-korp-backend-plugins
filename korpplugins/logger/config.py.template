@@ -53,9 +53,11 @@ LOG_CATEGORIES = [
     "debug",
     "env",
     "load",
+    "memory",
     "params",
     "referrer",
     "result",
+    "rusage",
     "times",
     "userinfo",
 ]
