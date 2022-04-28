@@ -22,6 +22,7 @@ import hashlib
 import logging
 import os
 import os.path
+import resource
 import time
 
 import korppluginlib
@@ -52,9 +53,11 @@ pluginconf = korppluginlib.get_plugin_config(
         "debug",
         "env",
         "load",
+        "memory",
         "params",
         "referrer",
         "result",
+        "rusage",
         "times",
         "userinfo",
     ],
@@ -271,6 +274,13 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         cpu_times_diff = tuple(cpu_times_end[i] - cpu_times_start[i]
                                for i in range(len(cpu_times_start)))
         self._log(logger.info, "times", "CPU-times-diff", *cpu_times_diff)
+        rusage_self = resource.getrusage(resource.RUSAGE_SELF)
+        rusage_children = resource.getrusage(resource.RUSAGE_CHILDREN)
+        self._log(logger.info, "memory", "Memory-max-RSS",
+                  rusage_self[2], rusage_children[2])
+        self._log(logger.debug, "rusage", "Resource-usage-self", rusage_self)
+        self._log(logger.debug, "rusage", "Resource-usage-children",
+                  rusage_children)
         self._log(logger.info, "times", "Elapsed", elapsed_time)
         self._end_logging(request)
 
