@@ -76,6 +76,10 @@ class LevelLoggerAdapter(logging.LoggerAdapter):
     LoggerAdapter.setlevel delegates to Logger.setLevel, so calling it
     sets the level for all LoggerAdapters of the Logger instance, which
     is not desired here.)
+
+    Also in contrast to LoggerAdapter, the values in the "extra"
+    keyword argument (dict) passed to logging methods override those
+    specified in the "extra" argument of the instance creation.
     """
 
     def __init__(self, logger, extra, level=None):
@@ -87,6 +91,18 @@ class LevelLoggerAdapter(logging.LoggerAdapter):
 
     def getEffectiveLevel(self):
         return self._level
+
+    def process(self, msg, kwargs):
+        """If the kwargs (passed to a logging method) contain dict
+        "extra", its values override those of the instance-level
+        "extra" instead of being discarded."""
+        if "extra" in kwargs:
+            extra = self.extra.copy()
+            extra.update(kwargs["extra"])
+            kwargs["extra"] = extra
+        else:
+            kwargs["extra"] = self.extra
+        return msg, kwargs
 
     def log(self, level, msg, *args, **kwargs):
         # LoggerAdapter.log calls logger.log, which re-checks isEnabledFor
