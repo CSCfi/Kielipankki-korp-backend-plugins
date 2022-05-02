@@ -47,6 +47,11 @@ pluginconf = korppluginlib.get_plugin_config(
     LOG_FORMAT = (
         "[korp.py %(levelname)s %(process)d:%(starttime_us)d @ %(asctime)s]"
         " %(message)s"),
+    # The maximum length of a log message, including the fixed part; 0 for
+    # unlimited
+    LOG_MESSAGE_DEFAULT_MAX_LEN = 100000,
+    # The text to insert where a log message is truncated to the maximum length
+    LOG_MESSAGE_TRUNCATE_TEXT = "[[...CUT...]]",
     # Categories of information to be logged: all available are listed
     LOG_CATEGORIES = [
         "auth",
@@ -120,6 +125,30 @@ class LevelLoggerAdapter(logging.LoggerAdapter):
             self._log(level, msg, args, **kwargs)
 
 
+class TruncatingLogFormatter(logging.Formatter):
+
+    """Log formatter class truncating log messages
+
+    The class truncates messages to the length specified by the maxlen
+    attribute of the LogRecord instance to be formatted or to
+    pluginconf.LOG_MESSAGE_DEFAULT_MAX_LEN if it does not exist. If
+    the value is <= 0, do not truncate the message.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def format(self, record):
+        maxlen = getattr(record, "maxlen",
+                         pluginconf.LOG_MESSAGE_DEFAULT_MAX_LEN)
+        result = super().format(record)
+        if maxlen > 0 and len(result) > maxlen:
+            trunc_text = pluginconf.LOG_MESSAGE_TRUNCATE_TEXT
+            result = (result[:maxlen - len(trunc_text) - 10]
+                      + trunc_text + result[-10:])
+        return result
+
+
 class KorpLogger(korppluginlib.KorpCallbackPlugin):
 
     """Class containing plugin functions for various mount points"""
@@ -146,7 +175,7 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         logdir = os.path.split(logfile)[0]
         os.makedirs(logdir, exist_ok=True)
         handler = logging.FileHandler(logfile)
-        handler.setFormatter(logging.Formatter(pluginconf.LOG_FORMAT))
+        handler.setFormatter(TruncatingLogFormatter(pluginconf.LOG_FORMAT))
         self._logger.addHandler(handler)
         # Storage for request-specific data, such as start times
         self._logdata = dict()
@@ -167,6 +196,8 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
                 "starttime": starttime,
                 "starttime_ms": int(starttime * 1000),
                 "starttime_us": int(starttime * 1e6),
+                # Default maximum message length
+                "maxlen": pluginconf.LOG_MESSAGE_DEFAULT_MAX_LEN,
             },
             loglevel)
         self._loggers[request_id] = logger
@@ -196,7 +227,7 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
             value = value(self._logdata[request_id].get(key, default))
         self._logdata[request_id][key] = value
 
-    def _log(self, log_fn, category, item, *values, format=None):
+    def _log(self, log_fn, category, item, *values, format=None, maxlen=None):
         """Log item in category with values using function log_fn and format
 
         Do not log if pluginconf.LOG_CATEGORIES is not None and it
@@ -206,12 +237,18 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         If multiple values are given, each of them gets the format
         specifier "%s", separated by spaces, unless format is
         explicitly specified.
+
+        If maxlen is an integer, use the value as the maximum length
+        of the log message, overriding the default.
         """
         if (KorpLogger._log_category(category)
                 and item not in pluginconf.LOG_EXCLUDE_ITEMS):
             if format is None:
                 format = " ".join(len(values) * ("%s",))
-            log_fn(item + ": " + format, *values)
+            extra = {}
+            if maxlen is not None:
+                extra["maxlen"] = maxlen
+            log_fn(item + ": " + format, *values, extra=extra)
 
     @staticmethod
     def _get_request_id(request):
@@ -306,7 +343,6 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         Note that the possible filter_result functions of plugins
         loaded before this one have been applied to the result.
         """
-        # TODO: Truncate the value if too long
         logger = KorpLogger._get_logger(request)
         if "corpus_hits" in result:
             self._log(logger.info, "result", "Hits", result["corpus_hits"])
