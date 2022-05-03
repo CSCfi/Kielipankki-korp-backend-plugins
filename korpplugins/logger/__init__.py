@@ -322,6 +322,15 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
 
     def exit_handler(self, endtime, elapsed_time, request):
         """Log information at exiting Korp"""
+
+        def format_rusage(rusage):
+            """Format the resource usage representation more compactly"""
+            return (str(rusage)
+                    .replace("resource.struct_rusage(", "")
+                    .replace(")", "")
+                    .replace("ru_", "")
+                    .replace(",", ""))
+
         logger = KorpLogger._get_logger(request)
         self._log(logger.info, "times", "CQP-time-total",
                   self._get_logdata(request, "cqp_time_sum"))
@@ -341,9 +350,10 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         rusage_children = resource.getrusage(resource.RUSAGE_CHILDREN)
         self._log(logger.info, "memory", "Memory-max-RSS",
                   rusage_self[2], rusage_children[2])
-        self._log(logger.debug, "rusage", "Resource-usage-self", rusage_self)
+        self._log(logger.debug, "rusage", "Resource-usage-self",
+                  format_rusage(rusage_self))
         self._log(logger.debug, "rusage", "Resource-usage-children",
-                  rusage_children)
+                  format_rusage(rusage_children))
         self._log(logger.info, "times", "Elapsed", elapsed_time)
         self._end_logging(request)
 
