@@ -52,6 +52,10 @@ pluginconf = korppluginlib.get_plugin_config(
     LOG_MESSAGE_DEFAULT_MAX_LEN = 100000,
     # The text to insert where a log message is truncated to the maximum length
     LOG_MESSAGE_TRUNCATE_TEXT = "[[...CUT...]]",
+    # The position in which to truncate a log message longer than the maximum
+    # length: positive values keep that many characters from the beginning,
+    # negative from the end
+    LOG_MESSAGE_TRUNCATE_POS = -100,
     # Categories of information to be logged: all available are listed
     LOG_CATEGORIES = [
         "auth",
@@ -144,8 +148,15 @@ class TruncatingLogFormatter(logging.Formatter):
         result = super().format(record)
         if maxlen > 0 and len(result) > maxlen:
             trunc_text = pluginconf.LOG_MESSAGE_TRUNCATE_TEXT
-            result = (result[:maxlen - len(trunc_text) - 10]
-                      + trunc_text + result[-10:])
+            trunc_pos = pluginconf.LOG_MESSAGE_TRUNCATE_POS
+            if trunc_pos < 0:
+                trunc_head_len = maxlen + trunc_pos - len(trunc_text)
+                trunc_tail_len = -trunc_pos
+            else:
+                trunc_head_len = trunc_pos
+                trunc_tail_len = maxlen - trunc_pos - len(trunc_text)
+            result = (result[:trunc_head_len] + trunc_text
+                      + result[-trunc_tail_len:])
         return result
 
 

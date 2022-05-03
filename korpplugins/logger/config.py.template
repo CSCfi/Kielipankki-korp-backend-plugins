@@ -52,6 +52,13 @@ LOG_MESSAGE_DEFAULT_MAX_LEN = 100000
 # The text to insert where a log message is truncated to the maximum length
 LOG_MESSAGE_TRUNCATE_TEXT = "[[...CUT...]]"
 
+# The position in which to truncate a log message longer than the maximum
+# length: positive values keep that many characters from the beginning,
+# negative from the end. Note that when counting from the beginning of the log
+# message, the fixed part is also counted, so the value should be larger than
+# the maximum length of the fixed part.
+LOG_MESSAGE_TRUNCATE_POS = -100
+
 # Categories of information to be logged: all available are listed. If a
 # category is omitted from the list, information marked with that category is
 # not logged. The category is not included in the log message.
