@@ -333,9 +333,9 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         cpu_times_end = os.times()[:4]
         self._log(logger.info, "times", "CPU-times", *cpu_times_end)
         # The difference of CPU times at the beginning and end of the request
-        # TODO: Round the values
-        cpu_times_diff = tuple(cpu_times_end[i] - cpu_times_start[i]
-                               for i in range(len(cpu_times_start)))
+        cpu_times_diff = tuple(
+            "{:.2f}".format(cpu_times_end[i] - cpu_times_start[i])
+            for i in range(len(cpu_times_start)))
         self._log(logger.info, "times", "CPU-times-diff", *cpu_times_diff)
         rusage_self = resource.getrusage(resource.RUSAGE_SELF)
         rusage_children = resource.getrusage(resource.RUSAGE_CHILDREN)
