@@ -302,7 +302,6 @@ class KorpLogger(korppluginlib.KorpCallbackPlugin):
         # Log user information (Shibboleth authentication only). How could we
         # make this depend on using a Shibboleth plugin?
         if KorpLogger._log_category("auth"):
-            self._log(logger.info, "auth", "Env", env)
             # request.remote_user doesn't seem to work here
             try:
                 remote_user = env["HTTP_REMOTE_USER"]
