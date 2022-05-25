@@ -49,6 +49,8 @@ class KorpEndpointPlugin(flask.Blueprint):
             import_name = calling_module.__name__
         if name is None:
             name = import_name
+        # Flask 2 seems not to allow "." in Blueprint name
+        name = name.replace(".", "_")
         super().__init__(name, import_name, *args, **kwargs)
 
     def route(self, rule, *, extra_decorators=None, **options):
