@@ -67,14 +67,14 @@ def auth():
     logging.getLogger().setLevel(
         logging.DEBUG if debugging else config.LOG_LEVEL)
     logging.info("Arguments: %s", args)
-    corpora = _get_permitted_resources(
+    authenticated, corpora = _get_permitted_resources(
         *(args.get(key, "") for key in [
             "remote_user", "affiliation", "entitlement"]))
     # If "format=short", use the old format with corpora as a list, instead of
     # the new (default) one with corpora as a dict with values {"read": True}.
     if args.get("format") != "short":
         corpora = dict((corpus, {"read": True}) for corpus in corpora)
-    result = dict(authenticated=True,
+    result = dict(authenticated=authenticated,
                   permitted_resources=dict(username=args.get("remote_user"),
                                            corpora=corpora))
     logging.info("Result: %s", result)
@@ -109,7 +109,7 @@ def _get_permitted_resources(username, affiliation, entitlement):
     """
     logging.debug("Username: %s", username)
     if not username:
-        return dict(authenticated=False)
+        return False, []
 
     cursor = mysql.connection.cursor()
 
@@ -170,7 +170,7 @@ def _get_permitted_resources(username, affiliation, entitlement):
     corpora = [corpus.upper() for corpus, in cursor]
     logging.debug("Corpora: %s", corpora)
 
-    return corpora
+    return True, corpora
 
 
 # Set up logging here and not inside 'if __name__ == "__main__"', so
