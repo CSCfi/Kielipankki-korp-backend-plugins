@@ -9,6 +9,7 @@ Retrieve a list of protected corpora from a MySQL database.
 import MySQLdb
 
 from korp import pluginlib, utils
+from korp.cwb import cwb
 
 
 # See README.py for further documentation of the configuration variables
@@ -68,12 +69,12 @@ class ProtectedCorporaDatabase(utils.ProtectedCorporaGetter):
 
     def get_protected_corpora(self, use_cache=False):
         """Get list of corpora with restricted access, in uppercase."""
-        protected_corpora = []
+        protected_corpora = None
         if self._connect():
             try:
                 cursor = self._connection.cursor()
                 cursor.execute(self._list_protected_corpora_sql)
-                protected_corpora.extend(corpus.upper() for corpus, in cursor)
+                protected_corpora = [corpus.upper() for corpus, in cursor]
                 cursor.close()
                 # If the database connection is not persistent, close it
                 if not pluginconf["PERSISTENT_DB_CONNECTION"]:
@@ -81,9 +82,13 @@ class ProtectedCorporaDatabase(utils.ProtectedCorporaGetter):
                     self._connection = None
             except (AttributeError, MySQLdb.MySQLError, MySQLdb.InterfaceError,
                     MySQLdb.DatabaseError):
-                # Assume that no corpora are protected if trying to access the
-                # database results in an error
                 pass
+        # Assume that all corpora are protected if trying to access the
+        # database results in an error
+        if protected_corpora is None:
+            # The first item in the result of "show corpora;" is CQP
+            # version, so omit it
+            protected_corpora = list(cwb.run_cqp("show corpora;"))[1:]
         return protected_corpora
 
     def _connect(self):
