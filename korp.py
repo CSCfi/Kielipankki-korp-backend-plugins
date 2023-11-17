@@ -391,7 +391,7 @@ def info(args):
     # helps, though.
     if strict:
         corpora, _ = filter_undefined_corpora(list(corpora), args)
-    protected = get_protected_corpora()
+    protected = get_protected_corpora(corpora)
 
     result = {"version": KORP_VERSION, "cqp_version": version, "corpora": list(corpora), "protected_corpora": protected}
 
@@ -3556,7 +3556,7 @@ def check_authentication(corpora):
     """Take a list of corpora, and if any of them are protected, run authentication.
     Raises an error if authentication fails."""
 
-    protected = get_protected_corpora()
+    protected = get_protected_corpora(corpora)
     if protected:
         # Split parallel corpora
         corpora = [cc for c in corpora for cc in c.split("|")]
@@ -3569,7 +3569,7 @@ def check_authentication(corpora):
                                               ", ".join(unauthorized))
 
 
-def get_protected_corpora():
+def get_protected_corpora(corpora):
     """Return a list of protected corpora."""
     protected = []
     if config.PROTECTED_FILE:
@@ -3577,9 +3577,13 @@ def get_protected_corpora():
             protected = [x.strip() for x in infile.readlines()]
     # Even though the hook point is named "filter_protected_corpora", its
     # callbacks typically add protected corpora to an initially empty list
-    protected = (korppluginlib.KorpCallbackPluginCaller
-                 .filter_value_for_request("filter_protected_corpora",
-                                           protected))
+    # On failure, consider all corpora protected
+    try:
+        protected = (korppluginlib.KorpCallbackPluginCaller
+                     .filter_value_for_request("filter_protected_corpora",
+                                               protected))
+    except ConnectionError:
+        return corpora
     return protected
 
 
