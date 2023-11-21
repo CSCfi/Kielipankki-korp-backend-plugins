@@ -10,10 +10,6 @@ import MySQLdb
 
 import korppluginlib
 
-def log(s):
-    with open('/tmp/tmp.log', 'a') as fobj:
-        fobj.write(s)
-
 # See config.py.template for further documentation of the configuration
 # variables
 pluginconf = korppluginlib.get_plugin_config(
@@ -79,19 +75,17 @@ class ProtectedCorporaDatabase(korppluginlib.KorpCallbackPlugin):
                 cursor.execute(self._list_protected_corpora_sql)
                 protected_corpora.extend(corpus for corpus, in cursor)
                 cursor.close()
-                log(f'filter_protected_corpora happy\n')
                 # If the database connection is not persistent, close it
                 if not pluginconf.PERSISTENT_DB_CONNECTION:
                     self._connection.close()
                     self._connection = None
             except (AttributeError, MySQLdb.MySQLError, MySQLdb.InterfaceError,
                     MySQLdb.DatabaseError) as e:
-                log(f'filter_protected_corpora throwing {e}\n')
                 # Assume that no corpora are protected if trying to access the
                 # database results in an error
                 # NOPE! Instead raise an exception, SH 14.11.2023.
                 raise ConnectionError
-        log(f'filter_protected_corpora returning {protected_corpora}\n')
+
         return protected_corpora
 
     def _connect(self):
@@ -102,13 +96,11 @@ class ProtectedCorporaDatabase(korppluginlib.KorpCallbackPlugin):
         self._connection to the connection and return it. If
         connecting fails, set it to None and return None.
         """
-        log(f'Entering _connect with params {self._conn_params}\n')
         if not self._connection:
             try:
                 self._connection = MySQLdb.connect(**self._conn_params)
             except (MySQLdb.MySQLError, MySQLdb.InterfaceError,
                     MySQLdb.DatabaseError) as e:
-                log(f'MySQLdb.connect threw {e}\n')
                 print("korpplugins.protectedcorporadb: Error connecting"
                       " to database:", e)
                 self._connection = None
