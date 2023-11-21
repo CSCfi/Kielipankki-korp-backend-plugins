@@ -83,7 +83,6 @@ class ProtectedCorporaDatabase(korppluginlib.KorpCallbackPlugin):
                     MySQLdb.DatabaseError) as e:
                 # Assume that no corpora are protected if trying to access the
                 # database results in an error
-                # NOPE! Instead raise an exception, SH 14.11.2023.
                 raise ConnectionError
 
         return protected_corpora
