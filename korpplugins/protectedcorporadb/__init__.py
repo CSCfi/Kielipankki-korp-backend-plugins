@@ -10,7 +10,6 @@ import MySQLdb
 
 import korppluginlib
 
-
 # See config.py.template for further documentation of the configuration
 # variables
 pluginconf = korppluginlib.get_plugin_config(
@@ -81,10 +80,11 @@ class ProtectedCorporaDatabase(korppluginlib.KorpCallbackPlugin):
                     self._connection.close()
                     self._connection = None
             except (AttributeError, MySQLdb.MySQLError, MySQLdb.InterfaceError,
-                    MySQLdb.DatabaseError):
+                    MySQLdb.DatabaseError) as e:
                 # Assume that no corpora are protected if trying to access the
                 # database results in an error
-                pass
+                raise ConnectionError
+
         return protected_corpora
 
     def _connect(self):
@@ -103,4 +103,5 @@ class ProtectedCorporaDatabase(korppluginlib.KorpCallbackPlugin):
                 print("korpplugins.protectedcorporadb: Error connecting"
                       " to database:", e)
                 self._connection = None
+                raise ConnectionError
         return self._connection
