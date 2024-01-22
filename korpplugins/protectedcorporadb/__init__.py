@@ -70,28 +70,34 @@ class ProtectedCorporaDatabase(utils.ProtectedCorporaGetter):
     def get_protected_corpora(self):
         """Get list of corpora with restricted access, in uppercase."""
         protected_corpora = None
+
+        def db_fetch():
+            with self._connection.cursor() as cursor:
+                cursor.execute(self._list_protected_corpora_sql)
+                return [corpus.upper() for corpus, in cursor]
+
         if self._connect():
             try:
-                cursor = self._connection.cursor()
-                cursor.execute(self._list_protected_corpora_sql)
-                protected_corpora = [corpus.upper() for corpus, in cursor]
-                cursor.close()
-                # If the database connection is not persistent, close it
-                if not pluginconf["PERSISTENT_DB_CONNECTION"]:
-                    self._connection.close()
-                    self._connection = None
-            except (AttributeError, MySQLdb.MySQLError, MySQLdb.InterfaceError,
-                    MySQLdb.DatabaseError):
-                pass
-        # Assume that all corpora are protected if trying to access the
-        # database results in an error
-        if protected_corpora is None:
-            # The first item in the result of "show corpora;" is CQP
-            # version, so omit it
-            protected_corpora = list(cwb.run_cqp("show corpora;"))[1:]
+                protected_corpora = db_fetch()
+            except (
+                AttributeError,
+                MySQLdb.MySQLError,
+                MySQLdb.InterfaceError,
+                MySQLdb.DatabaseError,
+            ):
+                # retry in case connection is in bad state
+                # if we still can't connect, cause exception & handle it in
+                # the caller, which can try to use its cache
+                self._connect(force_reconnect=True)
+                protected_corpora = db_fetch()
+
+        if not pluginconf["PERSISTENT_DB_CONNECTION"]:
+            self._connection.close()
+            self._connection = None
+
         return protected_corpora
 
-    def _connect(self):
+    def _connect(self, force_reconnect=False):
         """Connect to authorization database if not already connected.
 
         Connect to the authorization database with parameters
@@ -99,12 +105,17 @@ class ProtectedCorporaDatabase(utils.ProtectedCorporaGetter):
         self._connection to the connection and return it. If
         connecting fails, set it to None and return None.
         """
-        if not self._connection:
+        if (not self._connection) or force_reconnect:
             try:
                 self._connection = MySQLdb.connect(**self._conn_params)
-            except (MySQLdb.MySQLError, MySQLdb.InterfaceError,
-                    MySQLdb.DatabaseError) as e:
-                print("korpplugins.protectedcorporadb: Error connecting"
-                      " to database:", e)
+            except (
+                MySQLdb.MySQLError,
+                MySQLdb.InterfaceError,
+                MySQLdb.DatabaseError,
+            ) as e:
+                print(
+                    "korpplugins.protectedcorporadb: Error connecting" " to database:",
+                    e,
+                )
                 self._connection = None
         return self._connection
