@@ -67,7 +67,7 @@ class ProtectedCorporaDatabase(utils.ProtectedCorporaGetter):
         if self._connection:
             self._connection.close()
 
-    def get_protected_corpora(self, use_cache=False):
+    def get_protected_corpora(self):
         """Get list of corpora with restricted access, in uppercase."""
         protected_corpora = None
         if self._connect():
