@@ -70,12 +70,6 @@ class ProtectedCorporaDatabase(utils.ProtectedCorporaGetter):
     def get_protected_corpora(self):
         """Get list of corpora with restricted access, in uppercase."""
         protected_corpora = None
-        connection_errors = (
-            AttributeError,
-            MySQLdb.MySQLError,
-            MySQLdb.InterfaceError,
-            MySQLdb.DatabaseError,
-        )
 
         def db_fetch():
             with self._connection.cursor() as cursor:
@@ -85,15 +79,17 @@ class ProtectedCorporaDatabase(utils.ProtectedCorporaGetter):
         if self._connect():
             try:
                 protected_corpora = db_fetch()
-            except connection_errors:
+            except (
+                AttributeError,
+                MySQLdb.MySQLError,
+                MySQLdb.InterfaceError,
+                MySQLdb.DatabaseError,
+            ):
                 # retry in case connection is in bad state
                 # if we still can't connect, cause exception & handle it in
                 # the caller, which can try to use its cache
                 self._connect(force_reconnect=True)
-                try:
-                    protected_corpora = db_fetch()
-                except connection_errors:
-                    throw ConnectionError
+                protected_corpora = db_fetch()
 
         if not pluginconf["PERSISTENT_DB_CONNECTION"]:
             self._connection.close()
