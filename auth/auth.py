@@ -66,7 +66,13 @@ def auth():
     debugging = args.get("debug", "").lower() in ["1", "true", "yes"]
     logging.getLogger().setLevel(
         logging.DEBUG if debugging else config.LOG_LEVEL)
-    logging.info("Arguments: %s", args)
+    args_without_personal_data = {
+        key: value for key, value in args if key != "remote_user"
+    }
+    if debugging:
+        logging.info("Arguments: %s", args)
+    else:
+        logging.info("Arguments: %s", args_without_personal_data)
     authenticated, corpora = _get_permitted_resources(
         *(args.get(key, "") for key in [
             "remote_user", "affiliation", "entitlement"]))
@@ -74,10 +80,17 @@ def auth():
     # the new (default) one with corpora as a dict with values {"read": True}.
     if args.get("format") != "short":
         corpora = dict((corpus, {"read": True}) for corpus in corpora)
-    result = dict(authenticated=authenticated,
-                  permitted_resources=dict(username=args.get("remote_user"),
-                                           corpora=corpora))
-    logging.info("Result: %s", result)
+    result = dict(
+        authenticated=authenticated, permitted_resources=dict(corpora=corpora)
+    )
+    # First we log the result without personal information
+    if not debugging:
+        logging.info("Result: %s", result)
+    # Then we add the validated username
+    result["permitted_resources"]["username"] = args.get("remote_user")
+    # Only log it for debugging
+    if debugging:
+        logging.info("Result: %s", result)
     return Response(json.dumps(result), mimetype="application/json")
 
 
