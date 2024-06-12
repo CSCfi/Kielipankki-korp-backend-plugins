@@ -3579,11 +3579,19 @@ def get_protected_corpora(corpora):
     # callbacks typically add protected corpora to an initially empty list
     # On failure, consider all corpora protected
     try:
-        protected = (korppluginlib.KorpCallbackPluginCaller
-                     .filter_value_for_request("filter_protected_corpora",
-                                               protected))
+        protected = korppluginlib.KorpCallbackPluginCaller.filter_value_for_request(
+            "filter_protected_corpora", protected
+        )
     except ConnectionError:
-        return corpora
+        # If we can't connect, trust the cache if available
+        with mc_pool.reserve() as mc:
+            result = mc.get("%s:info_%s" % (cache_prefix(), int(strict)))
+            if result:
+                return result["protected_corpora"]
+            else:
+                # If all else fails, consider evenrything protected.
+                # This will crash Korp until the PUB-authentication bug is fixed.
+                return corpora
     return protected
 
 
